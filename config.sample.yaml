@@ -1,0 +1,26 @@
+# Configuration specific to the application service. All fields (unless otherwise marked) are required.
+homeserver:
+  # The domain for the client-server API calls.
+  url: "http://localhost:8008"
+
+  # The domain part for user IDs on this home server. Usually, but not always, this is the same as the
+  # home server's URL.
+  domain: "localhost"
+
+  # The URL of the homeserver hosting media files. This is only used to transform uploaded content to
+  # messages for bridged users. If not specified, the `url` for the client-server API is used.
+  #mediaUrl: "http://localhost:8008"
+
+# Configuration specific to the bridge. All fields (unless otherwise marked) are required.
+mcBridge:
+  # Your application's client ID and secret
+  clientId: ""
+  clientSecret: ""
+
+  # The public URL base for OAuth
+  publicUrlBase: "https://instagram.t2bot.io/"
+
+  # Appearance options for the Matrix bot
+  appearance:
+    displayName: "Instagram Bridge"
+    avatarUrl: "http://i.imgur.com/DQKje5W.png" # instagram icon

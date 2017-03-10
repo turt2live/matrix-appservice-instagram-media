@@ -1,7 +1,17 @@
 var uuid = require('uuid');
 var request = require('request');
 
+/**
+ * Handles the processing of authentication requests for Instagram
+ */
 class InstagramOAuth {
+
+    /**
+     * Creates a new Instagram OAuth handler
+     * @param {string} clientId the client ID for the Instagram application
+     * @param {string} clientSecret the client secret for the Instagram application
+     * @param {string} baseReturnUrl the base URL for redirects (eg: https://myapp.com/auth/complete)
+     */
     constructor(clientId, clientSecret, baseReturnUrl) {
         this._clientId = clientId;
         this._clientSecret = clientSecret;
@@ -9,6 +19,11 @@ class InstagramOAuth {
         this._pendingAuths = {}; // TODO: Replace with a real database
     }
 
+    /**
+     * Registers the routes for authentication with the web handler. Currently those routes are:
+     * * GET /auth/redirect
+     * @param {WebHandler} webHandler the web handler to register the routes with
+     */
     registerRoutes(webHandler) {
         webHandler.app.get("/auth/redirect", function (req, res) {
             if (req.query.hasOwnProperty('error')) {
@@ -56,16 +71,31 @@ class InstagramOAuth {
         }.bind(this));
     }
 
+    /**
+     * Generates an authentication URL for a Matrix ID
+     * @param {string} mxid the matrix user ID to generate the auth link for
+     * @returns {string} the URL for the user to auth with
+     */
     generateAuthUrl(mxid) {
         var id = uuid.v4();
         this._pendingAuths[id] = mxid;
         return this.formatAuthUrl(id);
     }
 
+    /**
+     * Formats an authentication URL from a session state variable
+     * @param {string} sessionId a session ID to associate with the link
+     * @returns {string} the link for authentication
+     */
     formatAuthUrl(sessionId) {
         return "https://api.instagram.com/oauth/authorize/?client_id=" + encodeURIComponent(this._clientId) + "&redirect_uri=" + encodeURIComponent(this.formatRedirectUrl(sessionId)) + "&response_type=code&scope=basic+public_content";
     }
 
+    /**
+     * Formats a redirect URL from a session state variable
+     * @param {string} sessionId the session ID to associate with the link
+     * @returns {string} the generated redirect URL
+     */
     formatRedirectUrl(sessionId) {
         return this._baseReturnUrl + "?sessionId=" + sessionId;
     }
