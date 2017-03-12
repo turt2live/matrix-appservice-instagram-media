@@ -6,16 +6,13 @@ var WebHandler = require("./src/WebHandler");
 var InstagramOAuth = require("./src/auth/InstagramOAuth");
 var LocalStorage = require("node-localstorage").LocalStorage;
 var InstagramBridge = require("./src/InstagramBridge");
+var InstagramHandler = require("./src/InstagramHandler");
+var prepareDatabase = require("./src/database");
 
 global.localStorage = new LocalStorage("./account_data"); // TODO: Should probably replace localstorage with a real database
 
-var web = new WebHandler('0.0.0.0', 4501);
-var auth = new InstagramOAuth('XXXXXXXXXXXXXXXXX', 'XXXXXXXXXXXXXXXXX', 'XXXXXXXXXXXXXXXXX');
-
-auth.registerRoutes(web);
-
 new Cli({
-  registrationPath: "appservice-registration-instagram.yaml",
+    registrationPath: "appservice-registration-instagram.yaml",
     enableRegistration: true,
     enableLocalpart: true,
     bridgeConfig: {
@@ -31,14 +28,18 @@ new Cli({
                 clientId: "",
                 clientSecret: "",
                 publicUrlBase: "",
-                botAppearance: {
+                appearance: {
                     displayName: "Instagram Bridge",
                     avatarUrl: "http://i.imgur.com/DQKje5W.png" // instagram icon
                 }
+            },
+            web: {
+                bind: "0.0.0.0",
+                port: 4501
             }
         }
     },
-    generateRegistration: function(registration, callback){
+    generateRegistration: function (registration, callback) {
         registration.setId(AppServiceRegistration.generateToken());
         registration.setHomeserverToken(AppServiceRegistration.generateToken());
         registration.setAppServiceToken(AppServiceRegistration.generateToken());
@@ -54,10 +55,18 @@ new Cli({
         callback(registration);
     },
     run: function (port, config, registration) {
-        var bridge = new InstagramBridge(config, registration, auth);
-        bridge.run(port).catch(err => {
-            log.error("Init", "Failed to start bridge");
-            throw err;
+        prepareDatabase().then(db=> {
+            var web = new WebHandler(config.web.bind, config.web.port);
+            var auth = new InstagramOAuth(config.instagram.clientId, config.instagram.clientSecret, config.instagram.publicUrlBase + "/auth/redirect", db);
+            var handler = new InstagramHandler(db);
+
+            auth.registerRoutes(web);
+
+            var bridge = new InstagramBridge(config, registration, auth, handler);
+            bridge.run(port).catch(err => {
+                log.error("Init", "Failed to start bridge");
+                throw err;
+            });
         });
     }
 }).run();

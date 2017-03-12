@@ -14,6 +14,7 @@ class WebHandler {
     constructor(bindAddr, port) {
         this.app = express();
 
+        this.app.use(express.static('views/static'));
         this.app.set("view engine", "pug"); // views located in /views
         this.app.listen(port, bindAddr);
     }

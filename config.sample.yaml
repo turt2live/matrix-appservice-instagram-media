@@ -12,15 +12,22 @@ homeserver:
   #mediaUrl: "http://localhost:8008"
 
 # Configuration specific to the bridge. All fields (unless otherwise marked) are required.
-mcBridge:
+instagram:
   # Your application's client ID and secret
   clientId: ""
   clientSecret: ""
 
   # The public URL base for OAuth
-  publicUrlBase: "https://instagram.t2bot.io/"
+  publicUrlBase: "https://instagram.t2bot.io"
 
   # Appearance options for the Matrix bot
   appearance:
     displayName: "Instagram Bridge"
     avatarUrl: "http://i.imgur.com/DQKje5W.png" # instagram icon
+
+# Configuration related to the web portion of the bridge. Handles oauth redirects and general information
+web:
+  bind: '0.0.0.0'
+  port: 4501
+
+

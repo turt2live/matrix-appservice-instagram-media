@@ -6,7 +6,10 @@ instagram-registration.yaml
 appservice-registration-instagram.yaml
 rooms.db
 users.db
-account_data
+
+instagram-development.db
+instagram-production.db
+
 
 # Logs
 logs
