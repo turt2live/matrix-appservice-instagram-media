@@ -1,10 +1,12 @@
 var Bridge = require("matrix-appservice-bridge").Bridge;
 var MatrixRoom = require("matrix-appservice-bridge").MatrixRoom;
+var MatrixUser = require("matrix-appservice-bridge").MatrixUser;
 var RemoteRoom = require("matrix-appservice-bridge").RemoteRoom;
 var RemoteUser = require("matrix-appservice-bridge").RemoteUser;
 var log = require("npmlog");
 var util = require("./utils");
 var _ = require("lodash");
+var moment = require("moment");
 
 /**
  * The actual bridge itself
@@ -17,8 +19,9 @@ class InstagramBridge {
      * @param {AppServiceRegistration} registration the registration file to use
      * @param {InstagramOAuth} auth the auth handler to use
      * @param {InstagramHandler} handler the instagram handler to use
+     * @param {*} db the sqlite3 database that powers the bridge
      */
-    constructor(config, registration, auth, handler) {
+    constructor(config, registration, auth, handler, db) {
         this._igAuth = auth;
         this._igHandler = handler;
         this._config = config;
@@ -26,14 +29,15 @@ class InstagramBridge {
         this._domain = null; // string
         this._mxid = null; // string
         this._started = false;
+        this._db = db;
 
         this._bridge = new Bridge({
             registration: this._registration,
             homeserverUrl: this._config.homeserver.url,
             domain: this._config.homeserver.domain,
             controller: {
-                onEvent: this._onEvent.bind(this),
                 onUserQuery: this._onUserQuery.bind(this),
+                onEvent: this._onEvent.bind(this),
                 onAliasQuery: this._onAliasQuery.bind(this),
                 onLog: this._onLog.bind(this)
 
@@ -67,6 +71,16 @@ class InstagramBridge {
      */
     _getIntent() {
         return this._bridge.getIntent(this._mxid);
+    }
+
+    /**
+     * Gets an Intent for a bridged Instagram user
+     * @param {String} username the Instagram username
+     * @returns {Intent} the Intent for the user
+     * @private
+     */
+    _getInstagramIntent(username) {
+        return this._bridge.getIntentFromLocalpart("@_instagram_" + username);
     }
 
     /**
@@ -163,7 +177,7 @@ class InstagramBridge {
                     body: "All of your authentication tokens for Instagram have been revoked. To reauthenticate, please send me the message !auth",
                     msgtype: "m.notice"
                 });
-            }, err=>{
+            }, err=> {
                 log.error("InstagramBridge - !deauth", err);
                 this._getIntent().sendMessage(room.roomId, {
                     body: "There was an error processing your request. Please try again later.",
@@ -233,6 +247,12 @@ class InstagramBridge {
                     this._processRoom(roomId);
                 }
             });
+
+            // Start the polling timers
+            setInterval(() => {
+                this._checkUnsubscribedAccounts();
+            }, 15000); // 15s
+            this._checkUnsubscribedAccounts();
         });
     }
 
@@ -264,9 +284,10 @@ class InstagramBridge {
         }).then(aliasUserNames => {
             this._bridge.getBot().getJoinedMembers(roomId).then(roomMembers => {
                 var roomMemberIds = _.keys(roomMembers);
+
                 if (roomMemberIds.length == 1 && aliasUserNames.length === 0) {
                     log.info("InstagramBridge", "Leaving room '" + roomId + "': No more members. Not bridging room");
-                    this._bridge.getRoomStore().delete(roomId);
+                    this._bridge.getRoomStore().removeEntriesByMatrixRoomId(roomId);
                     this._getIntent().leave(roomId);
                 } else {
                     // There's more than 1 member - we probably need to bridge this room
@@ -343,17 +364,31 @@ class InstagramBridge {
      * @private
      */
     _updateRoomAspects(roomId, accountId) {
-        // TODO: Get instagram avatar and such
-        // return mcServer.ping().then(pingInfo => {
-        //     var item = JSON.parse(localStorage.getItem("server." + mcServer.getHostname() + "." + mcServer.getPort()) || "{}");
-        //     if (item.motd != pingInfo.motd || item.favicon_b64 != pingInfo.favicon_b64) {
-        //         this._getIntent().setRoomTopic(roomId, pingInfo.motd); // TODO: Should probably strip color codes and newlines from this to make it legible
-        //         util.uploadContentFromDataUri(this._bridge, this._appServiceUserId, pingInfo.favicon_b64, "server-icon.png").then(mxcUrl => {
-        //             this._getIntent().setRoomAvatar(roomId, mxcUrl, '');
-        //         });
-        //         localStorage.setItem("server." + mcServer.getHostname() + "." + mcServer.getPort(), JSON.stringify(pingInfo));
-        //     }
-        // });
+        var key = "room." + roomId.replace(/:/g, '_').replace(/!/g, '');
+        var storage = JSON.parse(localStorage.getItem(key)) || {};
+
+        return this._igHandler.getApiInstance().then(api=> {
+            return api.user(accountId);
+        }).then(user=> {
+            if (!user["data"])return;
+
+            if (user["data"]["profile_picture"] != storage.avatarUrl) {
+                util.uploadContentFromUrl(this._bridge, user['data']['profile_picture'], this._getIntent()).then(mxcUrl=> {
+                    this._getIntent().setRoomAvatar(roomId, mxcUrl, '');
+                    this._getInstagramIntent(user["data"]["username"]).setAvatarUrl(mxcUrl);
+                });
+            }
+
+            if (user["data"]["full_name"] != storage.name) {
+                this._getIntent().setRoomName(roomId, "[Instagram] " + user["data"]["full_name"]);
+                this._getInstagramIntent(user["data"]["username"]).setDisplayName(user["data"]["full_name"] + " (Instagram)");
+            }
+
+            localStorage.setItem(key, JSON.stringify({
+                avatarUrl: user["data"]["profile_picture"],
+                name: user["data"]["full_name"]
+            }));
+        });
     }
 
     _requestHandler(request, promise) {
@@ -414,39 +449,48 @@ class InstagramBridge {
         var username = parts[2];
         for (var i = 3; i < parts.length; i++) username += "_" + parts[i];
 
-        // TODO: Find out if account exists (using requester's oauth token if available, otherwise generic)
-        var accountId = "4766571501";
-
-        return this._getIntent().createRoom({
-            createAsClient: true,
-            options: {
-                room_alias_name: alias.split(":")[0], // localpart
-                name: "[Instagram] " + username, // TODO: Find public name and use that
-                preset: "public_chat",
-                visibility: "public"
-                // avatar and topic set when we bridge to the room
-            }
-        }).then(roomInfo=> {
-            return this._bridge.getRoomStore().linkRooms(new MatrixRoom(roomInfo.room_id), new RemoteRoom(username, {
-                ig_account_name: username,
-                ig_account_id: accountId
-            })).then(() => {
-                this._bridgeRoom(roomInfo.room_id, accountId);
-                return roomInfo;
+        return this._igHandler.getAccountId(username).then(accountId=> {
+            return this._getIntent().createRoom({
+                createAsClient: true,
+                options: {
+                    room_alias_name: alias.split(":")[0], // localpart
+                    name: "[Instagram] " + username, // TODO: Find public name and use that
+                    preset: "public_chat",
+                    visibility: "public"
+                    // avatar and topic set when we bridge to the room
+                }
+            }).then(roomInfo=> {
+                return this._bridge.getRoomStore().linkRooms(new MatrixRoom(roomInfo.room_id), new RemoteRoom(username, {
+                    ig_account_name: username,
+                    ig_account_id: accountId
+                })).then(() => {
+                    this._bridgeRoom(roomInfo.room_id, accountId);
+                    return roomInfo;
+                });
             });
         });
     }
 
     _onUserQuery(matrixUser) {
-        var userId = matrixUser.getId();
+        var userId = matrixUser.localpart;
 
         // Format: @_instagram_accountname:t2bot.io
+        var username = userId.substring("_instagram_".length);
+        var accountId = null;
+        return this._igHandler.getAccountId(username).then(id=> {
+            accountId = id;
+            return this._igHandler.getApiInstance();
+        }).then(api=> {
+            return api.user(accountId);
+        }).then(user=> {
+            if (!user["data"]) return null;
 
-        return new Promise((resolve, reject)=> {
-            // TODO: Upload account information (avatar, etc)
-            resolve({
-                name: "Instagram Account (Instagram)", // TODO: Use real display name
-                remote: new RemoteUser(userId)
+            return util.uploadContentFromUrl(this._bridge, user["data"]["profile_picture"], this._getIntent()).then(mxcUrl=> {
+                return {
+                    name: user["data"]["full_name"] + " (Instagram)",
+                    remote: new RemoteUser(accountId),
+                    url: mxcUrl
+                }
             });
         });
     }
@@ -456,6 +500,132 @@ class InstagramBridge {
         if (isError) fn = log.error;
 
         fn("InstagramBridge - onLog", line);
+    }
+
+    /**
+     * Finds and updates all Instagram accounts to better determine if they need updates
+     * @private
+     */
+    _checkUnsubscribedAccounts() {
+        log.info("InstagramBridge", "Finding accounts to update");
+        this._bridge.getBot().getJoinedRooms().then(rooms=> {
+            var remoteRooms = [];
+            var getLinks = (room) => {
+                return this._bridge.getRoomStore().getLinkedRemoteRooms(room).then(r=> {
+                    return {rooms: r, roomId: room};
+                });
+            };
+            var promises = rooms.map(getLinks.bind(this));
+            return Promise.all(promises).then(r=>_.flatten(r));
+        }).then(containers => {
+            var accounts = [];
+            for (var container of containers) {
+                for (var room of container.rooms) {
+                    // If there is no account id, then the room isn't bridged
+                    if (!room.get("ig_account_id")) continue;
+
+                    var lastUpdated = room.get("ig_last_updated") || 0;
+                    var lastHandled = room.get("ig_last_handled") || null;
+
+                    accounts.push({
+                        id: room.get("ig_account_id"),
+                        username: room.get("ig_account_name"),
+                        lastUpdated: lastUpdated,
+                        lastHandled: lastHandled,
+                        roomId: container.roomId
+                    });
+                }
+            }
+
+            log.info("InstagramBridge", "Found " + accounts.length + " accounts to update");
+
+            var inSegment = _.map(accounts, a=>"?").join(",");
+            this._db.all("SELECT * FROM ig_auth WHERE instagram_username IN (" + inSegment + ")", _.map(accounts, a=>a.username), function (error, rows) {
+                if (error)throw new Error(error);
+
+                var pollUsernames = _.map(rows, r=>r["instagram_username"]);
+                var requiresPoll = _.filter(accounts, a=>pollUsernames.indexOf(a.username) === -1);
+
+                log.info("InstagramBridge", "Found " + requiresPoll.length + " accounts that require polling. Starting poll.");
+
+                var sorted = _.sortBy(requiresPoll, a=>a.lastUpdated);
+                for (var account of sorted) {
+                    log.info("InstagramBridge", "Polling for update on account " + account.id + " (" + account.username + ")");
+                    this._pollAccountUpdate(account.id, account.lastHandled, account.roomId);
+                }
+            }.bind(this));
+        });
+    }
+
+    _pollAccountUpdate(accountId, lastHandledId, roomId) {
+        this._igHandler.getApiInstance().then(api=> {
+            return api.userMedia(accountId, {/*min_id: lastHandledId, */count: 1});
+        }, err=> {
+            log.error("InstagramBridge", "Poll failed for account " + accountId + " (" + roomId + "): failed to get API instance");
+            log.error("InstagramBridge", err);
+        }).then(media=> {
+            if (!media["data"]) throw new Error("API response missing 'data'");
+
+            var newId = null;
+            var promises = [];
+            var recents = media["data"];
+            for (var post of recents) {
+                if (post["id"] == lastHandledId) continue;
+                newId = post["id"];
+
+                promises.push(this._postMedia(accountId, post, roomId));
+            }
+
+            if (!newId) return new Promise((resolve, reject)=>resolve());
+
+            Promise.all(promises).then(() => {
+                return this._bridge.getRoomStore().getLinkedRemoteRooms(roomId).then(rooms => {
+                    for (var room of rooms) {
+                        room.set("ig_last_handled", newId);
+                        room.set("ig_last_updated", moment().format("x"));
+
+                        // HACK: This feels wrong. We shouldn't have to re-link the rooms to update the remote data
+                        this._bridge.getRoomStore().linkRooms(new MatrixRoom(roomId), room);
+                    }
+                });
+            });
+        }, err=> {
+            log.error("InstagramBridge", "Poll failed for account " + accountId + " (" + roomId + ")");
+            log.error("InstagramBridge", err);
+        }).catch(err=> {
+            log.error("InstagramBridge", "Poll failed for account " + accountId + " (" + roomId + ")");
+            log.error("InstagramBridge", err);
+        });
+    }
+
+    _postMedia(accountId, post, roomId) {
+        if (post["type"] !== "image") {
+            log.warn("InstagramBridge", "Not handling post " + post["id"] + " for account " + accountId + " in room " + roomId + " because it is not an image");
+            return;
+        }
+
+        var image = post["images"]["standard_resolution"];
+        var caption = post["caption"]["text"];
+        var filename = "ig-" + post["id"] + ".jpg";
+        var intent = this._getInstagramIntent(post["user"]["username"]);
+
+        log.info("InstagramBridge", "Posting media " + filename + " to room " + roomId);
+        return util.uploadContentFromUrl(this._bridge, image["url"], this._getIntent(), filename).then(mxcUrl=> {
+            if (!mxcUrl)throw new Error("Failed to get MXC URL for image " + filename);
+            var msgContent = {
+                msgtype: "m.image",
+                body: filename,
+                url: mxcUrl,
+                info: {
+                    mimetype: "image/jpg",
+                    w: image["width"],
+                    h: image["height"]
+                }
+            };
+            intent.sendMessage(roomId, msgContent).then(() => {
+                intent.sendText(roomId, caption);
+            });
+        }).catch(err=>log.error("InstagramBridge", err));
     }
 }
 

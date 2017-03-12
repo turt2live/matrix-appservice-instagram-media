@@ -2,6 +2,8 @@
 
 Bridges Instagram to [[Matrix]](https://matrix.org).
 
+Matrix room: [#instagram:t2bot.io](https://matrix.to/#/#instagram:t2bot.io)
+
 # Requirements
 
 * [NodeJS](https://nodejs.org/en/) (`v6.9.2` or higher recommended)
@@ -15,6 +17,7 @@ Bridges Instagram to [[Matrix]](https://matrix.org).
 * Planned
 	* Instagram images automatically posted to rooms
 	* Ability to authenticate to speed up posting
+	* Joining hashtag rooms
 * Not Planned / Not Possible
 	* Matrix to Instagram posting (prohibited by Instagram)
 
@@ -75,7 +78,7 @@ To bridge an instagram such as `myaccount`, join the room `#_instagram_myaccount
 
 # General information and stuff
 
-This is based off [matrix-appservice-bridge](https://github.com/matrix-org/matrix-appservice-bridge) and uses []() to connect to Instagram for media processing.
+This is based off [matrix-appservice-bridge](https://github.com/matrix-org/matrix-appservice-bridge) and uses [instagram-api](https://www.npmjs.com/package/instagram-api) to connect to Instagram for media processing.
 
 Users of the bridge are encouraged to authenticate with the bridge (in a 1:1 conversation, send `!auth`) so the media rate limits can be reduced and spread over the user base. Media will also be posted to the room much faster than without authenticating (as media comes to the bridge for authenticated users, but requires polling when not authenticated).
 

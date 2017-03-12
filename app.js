@@ -43,7 +43,7 @@ new Cli({
         registration.setId(AppServiceRegistration.generateToken());
         registration.setHomeserverToken(AppServiceRegistration.generateToken());
         registration.setAppServiceToken(AppServiceRegistration.generateToken());
-        registration.setRateLimited(false); // disabled for the high-traffic nature of Minecraft
+        registration.setRateLimited(false); // disabled for the possibly high-traffic nature of Instagram
 
         if (!registration.getSenderLocalpart()) {
             registration.setSenderLocalpart("_instagram");
@@ -62,7 +62,7 @@ new Cli({
 
             auth.registerRoutes(web);
 
-            var bridge = new InstagramBridge(config, registration, auth, handler);
+            var bridge = new InstagramBridge(config, registration, auth, handler, db);
             bridge.run(port).catch(err => {
                 log.error("Init", "Failed to start bridge");
                 throw err;

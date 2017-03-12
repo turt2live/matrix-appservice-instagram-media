@@ -9,7 +9,6 @@ var log = require("npmlog");
 module.exports = function() {
     return new Promise((resolve, reject)=> {
         log.info("Database", "Preparing database");
-        console.log(process.cwd());
         var dbMigrate = DBMigrate.getInstance(true, {
             config: "./database.json",
             env: process.env.NODE_ENV || "development"
