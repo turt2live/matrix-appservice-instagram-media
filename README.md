@@ -1,5 +1,7 @@
 # matrix-appservice-instagram
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/turt2live/matrix-appservice-instagram.svg)](https://greenkeeper.io/)
+
 Bridges Instagram to [[Matrix]](https://matrix.org).
 
 Matrix room: [#instagram:t2bot.io](https://matrix.to/#/#instagram:t2bot.io)
