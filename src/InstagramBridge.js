@@ -251,7 +251,7 @@ class InstagramBridge {
             // Start the polling timers
             setInterval(() => {
                 this._checkUnsubscribedAccounts();
-            }, 15000); // 15s
+            }, 60000); // 60s
             this._checkUnsubscribedAccounts();
         });
     }
