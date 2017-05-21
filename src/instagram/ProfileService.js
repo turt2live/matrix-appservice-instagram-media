@@ -4,6 +4,8 @@ var log = require("./../util/LogService");
 var Q = require('q');
 var moment = require('moment');
 var fs = require("fs");
+var InstagramStore = require("./../storage/InstagramStore");
+var InstagramApiHandler = require("./InstagramApiHandler");
 
 /**
  * Represents a profile service for Instagram users

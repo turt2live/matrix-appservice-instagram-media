@@ -1,5 +1,5 @@
 var DBMigrate = require("db-migrate");
-var log = require("./../LogService");
+var log = require("./../util/LogService");
 var Sequelize = require('sequelize');
 var dbConfig = require("../../config/database.json");
 
@@ -141,6 +141,14 @@ class InstagramStore {
      */
     deletePendingAuthSessions(mxId) {
         return this.__PendingAuths.destroy({where: {mxId: mxId}});
+    }
+
+    /**
+     * Gets a random auth token from the database
+     * @returns {Promise<string>} resolves to an auth token, or null of none found
+     */
+    getRandomAuthToken() {
+        return this.__UserOAuthTokens.findOne({order: [[Sequelize.fn('RANDOM', '')]]}).then(auth => auth.token);
     }
 }
 
