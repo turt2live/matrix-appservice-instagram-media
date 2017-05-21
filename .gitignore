@@ -10,6 +10,8 @@ users.db
 instagram-development.db
 instagram-production.db
 
+room-store.db
+user-store.db
 
 # Logs
 logs

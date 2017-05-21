@@ -2,7 +2,7 @@ var Cli = require("matrix-appservice-bridge").Cli;
 var AppServiceRegistration = require("matrix-appservice-bridge").AppServiceRegistration;
 var log = require("./src/util/LogService");
 var path = require("path");
-var MinecraftBridge = require("./src/InstagramBridge");
+var InstagramBridge = require("./src/InstagramBridge");
 
 new Cli({
     registrationPath: "appservice-registration-instagram.yaml",
@@ -35,6 +35,16 @@ new Cli({
             web: {
                 bind: "0.0.0.0",
                 port: 4501
+            },
+            logging: {
+                file: "logs/instagram.log",
+                console: true,
+                consoleLevel: 'info',
+                fileLevel: 'verbose',
+                rotate: {
+                    size: 52428800,
+                    count: 5
+                }
             }
         }
     },

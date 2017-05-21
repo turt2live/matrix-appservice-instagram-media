@@ -8,7 +8,7 @@ Matrix room: [#instagram:t2bot.io](https://matrix.to/#/#instagram:t2bot.io)
 
 # Requirements
 
-* [NodeJS](https://nodejs.org/en/) (`v6.9.2` or higher recommended)
+* [NodeJS](https://nodejs.org/en/) (`v6.9` or higher recommended)
 * A [Synapse](https://github.com/matrix-org/synapse) server
 * An Instagram application to hook up to
 
@@ -34,10 +34,10 @@ Matrix room: [#instagram:t2bot.io](https://matrix.to/#/#instagram:t2bot.io)
    npm install
    ```
 
-2. Copy `config.sample.yaml` to `config.yaml` and fill in the appropriate fields
+2. Copy `config/sample.yaml` to `config/config.yaml` and fill in the appropriate fields
 3. Generate the registration file
    ```
-   node app.js -r -u "http://localhost:9000" -c config.yaml
+   node app.js -r -u "http://localhost:9000" -c config/config.yaml
    ```
    *Note:* The default URL to run the appservice is `http://localhost:9000`. If you have other appservices, or other requirements, pick an appropriate hostname and port.
 
@@ -58,7 +58,7 @@ Matrix room: [#instagram:t2bot.io](https://matrix.to/#/#instagram:t2bot.io)
 
 # Running
 
-Using the port specified during the install (`9000` by default), use `node app.js -p 9000 -c config.yaml` from the repository directory.
+Using the port specified during the install (`9000` by default), use `node app.js -p 9000 -c config/config.yaml` from the repository directory.
 
 The bridge should start working shortly afterwards.
 
@@ -76,7 +76,7 @@ The room must be public (so the bridge can join and start bridging media)
 
 #### When your homeserver has the bridge running
 
-To bridge an instagram such as `myaccount`, join the room `#_instagram_myaccount:domain.com`.
+To bridge an Instagram such as `myaccount`, join the room `#_instagram_myaccount:domain.com`.
 
 # General information and stuff
 

@@ -37,10 +37,28 @@ properties:
         type: "object"
         properties:
           mediaCheckFrequency:
-            type: "double"
+            type: "number"
           profileUpdateFrequency:
-            type: "double"
+            type: "number"
           profileCacheTime:
-            type: "double"
+            type: "number"
           profileUpdatesPerTick:
             type: "integer"
+  logging:
+    type: "object"
+    properties:
+      file:
+        type: "string"
+      console:
+        type: "boolean"
+      consoleLevel:
+        type: "string"
+      fileLevel:
+        type: "string"
+      rotate:
+        type: "object"
+        properties:
+          size:
+            type: "number"
+          count:
+            type: "number"
