@@ -1,0 +1,59 @@
+# Configuration specific to the application service. All fields (unless otherwise marked) are required.
+homeserver:
+  # The domain for the client-server API calls.
+  url: "http://localhost:8008"
+
+  # The domain part for user IDs on this home server. Usually, but not always, this is the same as the
+  # home server's URL.
+  domain: "localhost"
+
+  # The URL of the homeserver hosting media files. This is only used to transform uploaded content to
+  # messages for bridged users. If not specified, the `url` for the client-server API is used.
+  #mediaUrl: "http://localhost:8008"
+
+# Configuration specific to the bridge. All fields (unless otherwise marked) are required.
+instagram:
+  # Your application's client ID and secret
+  clientId: ""
+  clientSecret: ""
+
+  # The public URL base for OAuth
+  publicUrlBase: "https://instagram.t2bot.io"
+
+  # Appearance options for the Matrix bot
+  appearance:
+    displayName: "Instagram Bridge"
+    avatarUrl: "http://i.imgur.com/DQKje5W.png" # instagram icon
+
+  # Advanced settings for controlling how the Instagram rate limit is used
+  # All estimated number of accounts per hour are based on the assumption that the bridge does
+  # nothing else but that query. In practice, the rate limit must be balanced between the queries.
+  rateLimitConfig:
+    # How often an account should be checked for new media in hours.
+    # Does not apply to accounts that link themselves with the bridge.
+    # If this is set to 1, there are about 4500 accounts that can be checked per hour at a maximum.
+    # Raise this if you're encountering rate limit issues, and lower it if you'd like faster updates.
+    # Default is 1.5
+    mediaCheckFrequency: 1.5
+    # How often to check for updated profile information (username, displayname, avatar) in minutes.
+    # Applies to all bridged accounts.
+    # If this were set to 60, there are about 5000 accounts that can be checked per hour at a maximum.
+    # Raise this if you're encountering rate limit issues, and lower it if you'd like faster updates.
+    # Default is 30
+    profileUpdateFrequency: 30
+    # How long profile data is cached before it expires in hours.
+    # Applies to all bridged accounts.
+    # Default is 1
+    profileCacheTime: 1
+    # The maximum number of profiles to update per interval.
+    # The most expired profiles will be updated first
+    # Applies to all bridged accounts. Each account uses 1 request.
+    # Default is 500
+    profileUpdatesPerTick: 500
+
+# Configuration related to the web portion of the bridge. Handles oauth redirects and general information
+web:
+  bind: '0.0.0.0'
+  port: 4501
+
+

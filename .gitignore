@@ -1,7 +1,7 @@
 /.idea
 /account_data
 
-config.yaml
+config/config.yaml
 instagram-registration.yaml
 appservice-registration-instagram.yaml
 rooms.db

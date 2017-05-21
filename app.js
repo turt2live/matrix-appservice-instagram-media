@@ -1,15 +1,8 @@
 var Cli = require("matrix-appservice-bridge").Cli;
 var AppServiceRegistration = require("matrix-appservice-bridge").AppServiceRegistration;
-var log = require("npmlog");
+var log = require("./src/util/LogService");
 var path = require("path");
-var WebHandler = require("./src/WebHandler");
-var InstagramOAuth = require("./src/auth/InstagramOAuth");
-var LocalStorage = require("node-localstorage").LocalStorage;
-var InstagramBridge = require("./src/InstagramBridge");
-var InstagramHandler = require("./src/InstagramHandler");
-var prepareDatabase = require("./src/database");
-
-global.localStorage = new LocalStorage("./account_data"); // TODO: Should probably replace localstorage with a real database
+var MinecraftBridge = require("./src/InstagramBridge");
 
 new Cli({
     registrationPath: "appservice-registration-instagram.yaml",
@@ -17,7 +10,7 @@ new Cli({
     enableLocalpart: true,
     bridgeConfig: {
         affectsRegistration: true,
-        schema: path.join(__dirname, "src", "config-schema.yml"),
+        schema: path.join(__dirname, "config/schema.yml"),
         defaults: {
             homeserver: {
                 url: "http://localhost:8008",
@@ -31,6 +24,12 @@ new Cli({
                 appearance: {
                     displayName: "Instagram Bridge",
                     avatarUrl: "http://i.imgur.com/DQKje5W.png" // instagram icon
+                },
+                rateLimitConfig: {
+                    mediaCheckFrequency: 1.5,
+                    profileUpdateFrequency: 30,
+                    profileCacheTime: 1,
+                    profileUpdatesPerTick: 500
                 }
             },
             web: {
@@ -43,7 +42,7 @@ new Cli({
         registration.setId(AppServiceRegistration.generateToken());
         registration.setHomeserverToken(AppServiceRegistration.generateToken());
         registration.setAppServiceToken(AppServiceRegistration.generateToken());
-        registration.setRateLimited(false); // disabled for the possibly high-traffic nature of Instagram
+        registration.setRateLimited(false); // disabled because Instagram can get spammy
 
         if (!registration.getSenderLocalpart()) {
             registration.setSenderLocalpart("_instagram");
@@ -55,18 +54,11 @@ new Cli({
         callback(registration);
     },
     run: function (port, config, registration) {
-        prepareDatabase().then(db=> {
-            var web = new WebHandler(config.web.bind, config.web.port);
-            var auth = new InstagramOAuth(config.instagram.clientId, config.instagram.clientSecret, config.instagram.publicUrlBase + "/auth/redirect", db);
-            var handler = new InstagramHandler(db);
-
-            auth.registerRoutes(web);
-
-            var bridge = new InstagramBridge(config, registration, auth, handler, db);
-            bridge.run(port).catch(err => {
-                log.error("Init", "Failed to start bridge");
-                throw err;
-            });
+        log.init(config);
+        var bridge = new InstagramBridge(config, registration);
+        bridge.run(port).catch(err => {
+            log.error("Init", "Failed to start bridge");
+            throw err;
         });
     }
 }).run();
