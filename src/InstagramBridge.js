@@ -5,6 +5,8 @@ var log = require("./util/LogService");
 var ProfileService = require("./instagram/ProfileService");
 var PubSub = require("pubsub-js");
 var util = require("./utils.js");
+var WebService = require("./WebService");
+var OAuthService = require("./instagram/OAuthService");
 
 /**
  * The main entry point for the application - bootstraps the bridge
@@ -21,6 +23,10 @@ class InstagramBridge {
 
         this._config = config;
         this._registration = registration;
+        this._adminRooms = {}; // { roomId: AdminRoom }
+
+        WebService.bind(config.web.bind, config.web.port);
+        OAuthService.prepare(config.instagram.clientId, config.instagram.clientSecret, config.instagram.publicUrlBase);
 
         this._bridge = new Bridge({
             registration: this._registration,
@@ -136,17 +142,30 @@ class InstagramBridge {
 
             for (var room of remoteRooms) {
                 // TODO: Actually do bridge
+
             }
         });
     }
 
+    _tryProcessAdminEvent(event) {
+        var roomId = event.room_id;
+
+        if (this._adminRooms[roomId]) this._adminRooms.handleEvent(event);
+    }
+
+    removeAdminRoom(roomId) {
+        this._adminRooms[roomId] = null;
+    }
+
     _onEvent(request, context) {
         var event = request.getData();
+
+        this._tryProcessAdminEvent(event);
+
         if (event.type === "m.room.member" && event.content.membership === "invite") {
-            if (event.state_key == this._bridge.getBot().getUserId()) {
-                // TODO: Determine if room should be an admin room or not
-                log.info("InstagramBridge", "Bridge received invite to room " + event.room_id);
-                return this.getBotIntent().join(event.room_id);
+            if (event.state_key.indexOf("@_instagram_") === 0 && event.state_key.endsWith(":" + this._bridge.opts.domain)) {
+                log.info("InstagramBridge", event.state_key + " received invite to room " + event.room_id);
+                return this._bridge.getIntent(event.state_key).join(event.room_id).then(room => this._processRoom(room.roomId));
             }
         }
 
@@ -185,6 +204,7 @@ class InstagramBridge {
                     name: "[Instagram] " + profile.displayName,
                     visibility: "public",
                     topic: "",
+                    invite: ["@_instagram_" + handle + ":" + this._bridge.opts.domain],
                     initial_state: [{
                         type: "m.room.join_rules",
                         content: {join_rule: "public"},

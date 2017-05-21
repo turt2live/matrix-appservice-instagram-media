@@ -4,10 +4,10 @@
   },
   "development": {
     "driver": "sqlite3",
-    "filename": "instagram-development.db"
+    "filename": "db/development.db"
   },
   "production": {
     "driver": "sqlite3",
-    "filename": "instagram-production.db"
+    "filename": "db/production.db"
   }
 }

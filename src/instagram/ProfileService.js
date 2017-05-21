@@ -134,7 +134,7 @@ class ProfileService {
 
         log.info("ProfileService", "Saving cache to disk");
         this._saving = true;
-        fs.writeFile("uuidcache.json", JSON.stringify(this._profiles), {encoding: 'utf8'}, (err) => {
+        fs.writeFile("profile_cache.json", JSON.stringify(this._profiles), {encoding: 'utf8'}, (err) => {
             if (err) {
                 log.error("ProfileService", "Error saving cache to disk");
                 log.error("ProfileService", err);
@@ -145,7 +145,7 @@ class ProfileService {
 
     _loadFromCache() {
         try {
-            var response = fs.readFileSync("uuidcache.json", {encoding: 'utf8'});
+            var response = fs.readFileSync("profile_cache.json", {encoding: 'utf8'});
             if (response)this._profiles = JSON.parse(response);
 
             // Convert dates to moments

@@ -3,6 +3,7 @@ var AppServiceRegistration = require("matrix-appservice-bridge").AppServiceRegis
 var log = require("./src/util/LogService");
 var path = require("path");
 var InstagramBridge = require("./src/InstagramBridge");
+var InstagramStore = require("./src/storage/InstagramStore");
 
 new Cli({
     registrationPath: "appservice-registration-instagram.yaml",
@@ -65,10 +66,12 @@ new Cli({
     },
     run: function (port, config, registration) {
         log.init(config);
-        var bridge = new InstagramBridge(config, registration);
-        bridge.run(port).catch(err => {
-            log.error("Init", "Failed to start bridge");
-            throw err;
+        InstagramStore.prepare().then(() => {
+            var bridge = new InstagramBridge(config, registration);
+            bridge.run(port).catch(err => {
+                log.error("Init", "Failed to start bridge");
+                throw err;
+            });
         });
     }
 }).run();
