@@ -1,0 +1,9 @@
+<div *ngIf="isSuccess">
+    <h3 class="text-success">Authentication Successful</h3>
+    <p>The bridge now knows about your account. If you would like to stop the bridge from using your account, send the
+        message "!deauth" in a conversation with the bridge, much like how you started the authentication process.</p>
+</div>
+<div *ngIf="!isSuccess">
+    <h3 class="text-danger">Authentication Failed</h3>
+    <p>We were not able to process your authentication request. Please try again later.</p>
+</div>

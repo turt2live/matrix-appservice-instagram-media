@@ -5,7 +5,7 @@ class WebService {
     constructor() {
         this.app = express();
 
-        this.app.use(express.static("public"));
+        this.app.use(express.static("web-dist"));
     }
 
     bind(hostname, port) {

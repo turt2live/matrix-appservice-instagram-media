@@ -31,7 +31,8 @@ class OAuthService {
             InstagramStore.getMxIdForPendingAuth(sessionId).then(mxid => {
                 if (!mxid) {
                     log.warn("OAuthService", "Received unknown session ID " + sessionId);
-                    res.sendStatus(400);
+                    //res.sendStatus(400);
+                    res.redirect("/#/auth/failed");
                     return;
                 }
 
@@ -50,16 +51,18 @@ class OAuthService {
 
                     request(requestOpts, (err, response, body) => {
                         if (err) {
-                            res.sendStatus(500);
                             log.error("OAuthService", "Error processing authorization attempt");
                             log.error("OAuthService", err);
+                            //res.sendStatus(500);
+                            res.redirect("/#/auth/failed");
                             return;
                         }
 
                         var obj = JSON.parse(body);
                         if (obj["error_message"]) {
-                            res.sendStatus(500);
                             log.error("OAuthService", "Error processing authorization attempt: " + obj["error_message"]);
+                            //res.sendStatus(500);
+                            res.redirect("/#/auth/failed");
                             return;
                         }
 
@@ -72,22 +75,26 @@ class OAuthService {
                         InstagramStore.getOrCreateUser(username, accountId).then(igUser => {
                             return InstagramStore.saveAuthToken(igUser.id, mxid, authToken);
                         }, err=> {
-                            res.sendStatus(500);
                             log.error("OAuthService", "Error handling auth check");
                             log.error("OAuthService", err);
+                            //res.sendStatus(500);
+                            res.redirect("/#/auth/failed");
                         }).then(() => {
-                            res.sendStatus(200);
+                            //res.sendStatus(200);
+                            res.redirect("/#/auth/success");
                         }, err=> {
-                            res.sendStatus(500);
                             log.error("OAuthService", "Error handling auth check");
                             log.error("OAuthService", err);
+                            //res.sendStatus(500);
+                            res.redirect("/#/auth/failed");
                         });
                     });
                 })
             }, err => {
-                res.sendStatus(500);
                 log.error("OAuthService", "Error handling auth check");
                 log.error("OAuthService", err);
+                //res.sendStatus(500);
+                res.redirect("/#/auth/failed");
             });
         });
 
