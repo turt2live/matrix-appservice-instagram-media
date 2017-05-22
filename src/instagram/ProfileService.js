@@ -56,7 +56,11 @@ class ProfileService {
         // overrun ourselves with a lot of web requests
         var i = 0;
         var nextProfile = () => {
-            if (i >= expiredProfiles.length) return Promise.resolve();
+            if (i >= expiredProfiles.length) {
+                this._updating = false;
+                return Promise.resolve();
+            }
+
             return this._updateProfile(expiredProfiles[i].username);
         };
         nextProfile().then(() => {
