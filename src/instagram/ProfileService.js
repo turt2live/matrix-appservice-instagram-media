@@ -105,14 +105,14 @@ class ProfileService {
         }).then(account => {
             if (!account) return;
 
-            if (account.profile_picture != profile.avatarUrl) {
+            if (account.profile_picture != profile.avatarUrl || forceUpdate) {
                 profile.avatarUrl = account.profile_picture;
                 profile.expires = moment().add(this._cacheTime, 'hours');
                 PubSub.publish("profileUpdate", {changed: 'avatar', profile: profile, username: username});
                 changed = true;
             }
 
-            if (account.full_name != profile.displayName) {
+            if (account.full_name != profile.displayName || forceUpdate) {
                 profile.displayName = account.full_name;
                 profile.expires = moment().add(this._cacheTime, 'hours');
                 PubSub.publish("profileUpdate", {changed: 'displayName', profile: profile, username: username});
@@ -130,6 +130,14 @@ class ProfileService {
         if (!this._profiles[username])
             this._updateProfile(username, true);
         // else the timer will take care of it naturally
+    }
+
+    getProfile(username) {
+        if (this._profiles[username]) {
+            return Promise.resolve(this._profiles[username]);
+        } else {
+            return this._updateProfile(username, true).then(() => this._profiles[username]);
+        }
     }
 
     _loadFromCache() {

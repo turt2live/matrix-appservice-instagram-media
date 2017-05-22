@@ -149,7 +149,7 @@ class InstagramStore {
      * @returns {Promise<string>} resolves to an auth token, or null of none found
      */
     getRandomAuthToken() {
-        return this.__UserOAuthTokens.findOne({order: [[Sequelize.fn('RANDOM', '')]]}).then(auth => auth.token);
+        return this.__UserOAuthTokens.findOne({order: [[Sequelize.fn('RANDOM')]]}).then(auth => auth.token);
     }
 
     /**
@@ -179,11 +179,14 @@ class InstagramStore {
 }
 
 function timestamp(val) {
+    console.log(typeof(val));
     if (typeof(val) === 'number') {
         return val;
     } else if (typeof(val) === 'string') {
         return new Date(val).getTime();
-    } else return (val || new Date(0)).getTime();
+    } else if (!val || !val.getTime) {
+        return new Date(0).getTime();
+    } else return val;
 }
 
 class User {

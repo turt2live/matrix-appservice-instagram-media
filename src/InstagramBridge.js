@@ -216,16 +216,19 @@ class InstagramBridge {
             realProfile = profile;
             return util.uploadContentFromUrl(this._bridge, profile.avatarUrl, this.getBotIntent(), 'icon.png');
         }).then(avatarMxc => {
+            var virtualUserId = "@_instagram_" + handle + ":" + this._bridge.opts.domain;
+
             var userMap = {};
             userMap[this._bridge.getBot().getUserId()] = 100;
+            userMap[virtualUserId] = 50;
             return {
                 remote: remoteRoom,
                 creationOpts: {
                     room_alias_name: aliasLocalpart,
-                    name: "[Instagram] " + profile.displayName,
+                    name: "[Instagram] " + realProfile.displayName,
                     visibility: "public",
-                    topic: "",
-                    invite: ["@_instagram_" + handle + ":" + this._bridge.opts.domain],
+                    topic: realProfile.username + "'s Instagram feed",
+                    invite: [virtualUserId],
                     initial_state: [{
                         type: "m.room.join_rules",
                         content: {join_rule: "public"},

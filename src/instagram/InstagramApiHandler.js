@@ -30,8 +30,7 @@ class InstagramApiHandler {
         var tryCount = 0;
         var doCall = () => {
             tryCount++;
-            var api = this._getApiInstance();
-            return apiFn(api);
+            return this._getApiInstance().then(api => apiFn(api));
         };
         return new Promise((resolve, reject) => {
             doCall().then(result => {
