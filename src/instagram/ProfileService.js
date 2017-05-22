@@ -1,7 +1,6 @@
 var PubSub = require("pubsub-js");
 var request = require("request");
 var log = require("./../util/LogService");
-var Q = require('q');
 var moment = require('moment');
 var fs = require("fs");
 var InstagramStore = require("./../storage/InstagramStore");
@@ -16,7 +15,7 @@ class ProfileService {
         this._updating = false;
     }
 
-    setup(profileUpdateFrequency, profileCacheTime, profileUpdatesPerTick) {
+    prepare(profileUpdateFrequency, profileCacheTime, profileUpdatesPerTick) {
         this._cacheTime = profileCacheTime;
         this._maxUpdates = profileUpdatesPerTick;
 

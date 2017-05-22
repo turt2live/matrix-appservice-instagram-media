@@ -31,6 +31,11 @@ module.exports = function (sequelize, DataTypes) {
             type: DataTypes.TIME,
             allowNull: false,
             field: 'profileExpires'
+        },
+        mediaExpirationTime: {
+            type: DataTypes.TIME,
+            allowNull: true,
+            field: 'mediaExpirationTime'
         }
     }, {
         tableName: 'users',

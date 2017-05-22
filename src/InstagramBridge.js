@@ -4,11 +4,14 @@ var RemoteUser = require("matrix-appservice-bridge").RemoteUser;
 var log = require("./util/LogService");
 var ProfileService = require("./instagram/ProfileService");
 var PubSub = require("pubsub-js");
-var util = require("./utils.js");
+var util = require("./util/utils.js");
 var WebService = require("./WebService");
 var OAuthService = require("./instagram/OAuthService");
+var MediaHandler = require("./instagram/MediaHandler");
 var _ = require('lodash');
 var AdminRoom = require("./matrix/AdminRoom");
+var InstagramStore = require("./storage/InstagramStore");
+var moment = require('moment');
 
 /**
  * The main entry point for the application - bootstraps the bridge
@@ -62,11 +65,13 @@ class InstagramBridge {
         });
 
         PubSub.subscribe('profileUpdate', this._onProfileUpdate.bind(this));
+        PubSub.subscribe('newMedia', this._onMedia.bind(this));
     }
 
     run(port) {
         log.info("InstagramBridge", "Starting bridge");
-        return ProfileService.setup(this._config.instagram.rateLimitConfig.profileUpdateFrequency, this._config.instagram.rateLimitConfig.profileCacheTime, this._config.instagram.rateLimitConfig.profileUpdatesPerTick)
+        return ProfileService.prepare(this._config.instagram.rateLimitConfig.profileUpdateFrequency, this._config.instagram.rateLimitConfig.profileCacheTime, this._config.instagram.rateLimitConfig.profileUpdatesPerTick)
+            .then(() => MediaHandler.prepare(this._config.instagram.clientId, this._config.instagram.clientSecret, this._config.instagram.publicUrlBase, this._config.instagram.rateLimitConfig.mediaCheckFrequency))
             .then(() => this._bridge.run(port, this._config))
             .then(() => this._updateBotProfile())
             .then(() => this._bridgeKnownRooms())
@@ -136,6 +141,85 @@ class InstagramBridge {
             console.log(remoteRooms);
             // TODO: Update room aspects
         });
+    }
+
+    _onMedia(topic, media) {
+        var userIntent = this.getIgUserIntent(media.username);
+
+        this._getClientRooms(userIntent).then(rooms => {
+            // Only upload the media if we actually have rooms to post to
+            if (rooms.length == 0) return;
+
+            var mxcUrls = [];
+            var promises = [];
+            for (var container of media.media) {
+                promises.push(this._uploadMedia(container, mxcUrls, media.postId));
+            }
+
+            Promise.all(promises).then(() => {
+                for (var roomId of rooms) {
+                    this._postMedia(roomId, mxcUrls, media.postId, userIntent, media.caption, media.userId, media.sourceUrl);
+                }
+            });
+        });
+    }
+
+    _postMedia(roomId, content, postId, intent, caption, userId, sourceUrl) {
+        var contentPromises = [];
+        var eventIds = [];
+        for (var media of content) {
+            var body = {
+                url: media.mxc,
+                body: "igmedia-" + postId,
+                info: {
+                    w: media.container.content.width,
+                    h: media.container.content.height
+                },
+                external_url: sourceUrl
+            };
+
+            if (media.container.type == 'video') {
+                body['msgtype'] = 'm.video';
+                body['info']['mimetype'] = "video/mp4";
+            } else {
+                body['msgtype'] = 'm.image';
+                body['info']['mimetype'] = "image/jpg";
+            }
+
+            contentPromises.push(intent.sendMessage(roomId, body).then(event => {
+                eventIds.push(event.event_id);
+            }));
+        }
+
+        Promise.all(contentPromises).then(() => {
+            return intent.sendMessage(roomId, {
+                msgtype: "m.text",
+                body: caption,
+                external_url: sourceUrl
+            });
+        }).then(event => {
+            eventIds.push(event.event_id);
+        }).then(() => {
+            for (var eventId of eventIds) {
+                InstagramStore.storeMedia(userId, postId, eventId, roomId);
+            }
+            InstagramStore.updateMediaExpirationTime(userId, moment().add(this._config.instagram.rateLimitConfig.mediaCheckFrequency, 'hours').valueOf());
+        });
+    }
+
+    _uploadMedia(mediaContainer, urls, postId) {
+        return util.uploadContentFromUrl(this._bridge, mediaContainer.content.url, this.getBotIntent(), "igmedia-" + postId + "." + (mediaContainer.type == 'video' ? 'mp4' : 'jpg'))
+            .then(mxcUrl => urls.push({container: mediaContainer, mxc: mxcUrl}));
+    }
+
+    // HACK: The js-sdk doesn't support this endpoint. See https://github.com/matrix-org/matrix-js-sdk/issues/440
+    _getClientRooms(intent) {
+        // Borrowed from matrix-appservice-bridge: https://github.com/matrix-org/matrix-appservice-bridge/blob/435942dd32e2214d3aa318503d19b10b40c83e00/lib/components/app-service-bot.js#L34-L47
+        return intent.getClient()._http.authedRequestWithPrefix(undefined, "GET", "/joined_rooms", undefined, undefined, "/_matrix/client/r0")
+            .then(res => {
+                if (!res.joined_rooms) return [];
+                return res.joined_rooms;
+            });
     }
 
     _bridgeKnownRooms() {

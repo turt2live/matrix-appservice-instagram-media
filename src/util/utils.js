@@ -4,7 +4,7 @@
 var https = require('https');
 var http = require('http');
 var Buffer = require("buffer").Buffer;
-var log = require('./util/LogService');
+var log = require('./LogService');
 var mime = require('mime');
 var parseDataUri = require("parse-data-uri");
 

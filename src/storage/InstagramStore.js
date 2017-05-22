@@ -57,11 +57,15 @@ class InstagramStore {
         this.__Users = this._orm.import(__dirname + "/models/users");
         this.__UserOAuthTokens = this._orm.import(__dirname + "/models/user_oauth_tokens");
         this.__PendingAuths = this._orm.import(__dirname + "/models/pending_auths");
+        this.__UserMedia = this._orm.import(__dirname + "/models/user_media");
 
         // Relationships
 
         this.__Users.hasMany(this.__UserOAuthTokens, {foreignKey: 'userId', targetKey: 'userId'});
         this.__UserOAuthTokens.belongsTo(this.__Users, {foreignKey: 'userId'});
+
+        this.__Users.hasMany(this.__UserMedia, {foreignKey: 'userId', targetKey: 'userId'});
+        this.__UserMedia.belongsTo(this.__Users, {foreignKey: 'userId'});
     }
 
     /**
@@ -164,7 +168,7 @@ class InstagramStore {
         return this.__Users.findById(userId).then(user => {
             user.displayName = displayName;
             user.avatarUrl = avatarUrl;
-            user.profileExpires = expirationTime;
+            user.profileExpires = new Date(expirationTime);
             return user.save();
         });
     }
@@ -176,10 +180,81 @@ class InstagramStore {
     listUsers() {
         return this.__Users.findAll().then(users => users.map(u => new User(u)));
     }
+
+    /**
+     * Lists all the users that have expired media
+     * @returns {Promise<User[]>} resolves to an array of users with expired media
+     */
+    listUsersWithExpiredMedia() {
+        return this.__Users.findAll({
+            where: {
+                mediaExpirationTime: {
+                    $or: [
+                        {$lt: Sequelize.literal("datetime(current_timestamp, 'localtime')")},
+                        {$eq: null}
+                    ]
+                }
+            }
+        }).then(users => users.map(u => new User(u)));
+    }
+
+    /**
+     * Lists all the users with authentication tokens
+     * @returns {Promise<number[]>} resolves to an array of user IDs that have authentication tokens
+     */
+    listTokenUserIds() {
+        return this.__UserOAuthTokens.findAll().then(tokens => {
+            var results = [];
+            for (var token of tokens) {
+                if (results.indexOf(token.userId) === -1) {
+                    results.push(token.userId);
+                }
+            }
+            return results;
+        });
+    }
+
+    /**
+     * Updates the media expiration time for a user
+     * @param {number} userId the user ID to update
+     * @param {number} expirationTime the new expiration time for the user
+     * @returns {Promise<>} resolves when complete
+     */
+    updateMediaExpirationTime(userId, expirationTime) {
+        return this.__Users.findById(userId).then(user => {
+            user.mediaExpirationTime = new Date(expirationTime);
+            return user.save();
+        });
+    }
+
+    /**
+     * Stores a reference to a media event
+     * @param {string} userId the user sending the media
+     * @param {string} mediaId the media's ID
+     * @param {string} mxEventId the matrix event ID
+     * @param {string} roomId the room the event occurred in
+     * @returns {Promise<>} resolves when completed
+     */
+    storeMedia(userId, mediaId, mxEventId, roomId) {
+        return this.__UserMedia.create({
+            userId: userId,
+            mxEventId: mxEventId,
+            mxRoomId: roomId,
+            mediaId: mediaId
+        });
+    }
+
+    /**
+     * Checks if a specific media ID has already been handled
+     * @param {string} mediaId the media ID to check
+     * @return {Promise<boolean>} resolves to whether or not the media has been handled
+     */
+    isMediaHandled(mediaId) {
+        return this.__UserMedia.findAll({where: {mediaId: mediaId}}).then(media => media && media.length > 0);
+    }
 }
 
 function timestamp(val) {
-    console.log(typeof(val));
     if (typeof(val) === 'number') {
         return val;
     } else if (typeof(val) === 'string') {
@@ -197,6 +272,7 @@ class User {
         this.displayName = dbFields.displayName;
         this.avatarUrl = dbFields.avatarUrl;
         this.profileExpires = timestamp(dbFields.profileExpires);
+        this.mediaExpires = timestamp(dbFields.mediaExpirationTime);
     }
 }
 
