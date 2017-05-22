@@ -14,13 +14,14 @@ Matrix room: [#instagram:t2bot.io](https://matrix.to/#/#instagram:t2bot.io)
 
 # Features
 
-* [ ] OAuth with Instagram to avoid rate limit problems
+* [x] OAuth with Instagram to avoid rate limit problems
 * [ ] Handling of authenticated users (subscribe API) 
-* [ ] Polling of usernames not linked to bridge
-* [ ] Posting media to Matrix rooms
+* [x] Polling of usernames not linked to bridge
+* [x] Posting media to Matrix rooms
 * [ ] Hashtag rooms - [#4](https://github.com/turt2live/matrix-appservice-instagram/issues/4)
 * [ ] Provisioning API - [#9](https://github.com/turt2live/matrix-appservice-instagram/issues/9)
 * [ ] Stats/Monitoring API - [#10](https://github.com/turt2live/matrix-appservice-instagram/issues/10)
+* [ ] Being able to unsubscribe your account from the bridge - [#15](https://github.com/turt2live/matrix-appservice-instagram/issues/15)
 
 ### Things that won't be added
 
