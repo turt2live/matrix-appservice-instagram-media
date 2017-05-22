@@ -132,24 +132,23 @@ class InstagramBridge {
 
         var botIntent = this.getBotIntent();
 
-        // TODO: Use datastore to save avatar because this doesn't work
-        var botProfile = botIntent.getClient().getAccountData('io.t2l.instagram.profile') || {};
-
-        var avatarUrl = botProfile.avatarUrl;
-        if (!avatarUrl || avatarUrl !== desiredAvatarUrl) {
-            util.uploadContentFromUrl(this._bridge, desiredAvatarUrl, botIntent).then(mxcUrl => {
-                log.verbose("InstagramBridge", "Avatar MXC URL = " + mxcUrl);
-                log.info("InstagramBridge", "Updating avatar for bridge bot");
-                botIntent.setAvatarUrl(mxcUrl);
-                botProfile.avatarUrl = desiredAvatarUrl;
-                botIntent.getClient().setAccountData('io.t2l.instagram.profile', botProfile);
-            });
-        }
-        botIntent.getProfileInfo(botIntent.getClient().credentials.userId, 'displayname').then(profile => {
-            if (profile.displayname != desiredDisplayName) {
-                log.info("InstagramBridge", "Updating display name from '" + profile.displayname + "' to '" + desiredDisplayName + "'");
-                botIntent.setDisplayName(desiredDisplayName);
+        InstagramStore.getBotAccountData().then(botProfile => {
+            var avatarUrl = botProfile.avatarUrl;
+            if (!avatarUrl || avatarUrl !== desiredAvatarUrl) {
+                util.uploadContentFromUrl(this._bridge, desiredAvatarUrl, botIntent).then(mxcUrl => {
+                    log.verbose("InstagramBridge", "Avatar MXC URL = " + mxcUrl);
+                    log.info("InstagramBridge", "Updating avatar for bridge bot");
+                    botIntent.setAvatarUrl(mxcUrl);
+                    botProfile.avatarUrl = desiredAvatarUrl;
+                    InstagramStore.setBotAccountData(botProfile);
+                });
             }
+            botIntent.getProfileInfo(this._bridge.getBot().getUserId(), 'displayname').then(profile => {
+                if (profile.displayname != desiredDisplayName) {
+                    log.info("InstagramBridge", "Updating display name from '" + profile.displayname + "' to '" + desiredDisplayName + "'");
+                    botIntent.setDisplayName(desiredDisplayName);
+                }
+            });
         });
     }
 

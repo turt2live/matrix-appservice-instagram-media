@@ -2,6 +2,7 @@ var DBMigrate = require("db-migrate");
 var log = require("./../util/LogService");
 var Sequelize = require('sequelize');
 var dbConfig = require("../../config/database.json");
+var _ = require("lodash");
 
 /**
  * Primary storage for the Instagram Bridge
@@ -66,6 +67,7 @@ class InstagramStore {
         this.__UserOAuthTokens = this._orm.import(__dirname + "/models/user_oauth_tokens");
         this.__PendingAuths = this._orm.import(__dirname + "/models/pending_auths");
         this.__UserMedia = this._orm.import(__dirname + "/models/user_media");
+        this.__BotAccountData = this._orm.import(__dirname + "/models/bot_account_data");
 
         // Relationships
 
@@ -259,6 +261,38 @@ class InstagramStore {
      */
     isMediaHandled(mediaId) {
         return this.__UserMedia.findAll({where: {mediaId: mediaId}}).then(media => media && media.length > 0);
+    }
+
+    /**
+     * Gets the account data for the bridge bot
+     * @returns {Promise<*>} a json object representing the key/value pairs
+     */
+    getBotAccountData() {
+        return this.__BotAccountData.findAll().then(rows => {
+            var container = {};
+            for (var row of rows) {
+                container[row.key] = row.value;
+            }
+            return container;
+        });
+    }
+
+    /**
+     * Saves the bridge bot's account data. Takes the value verbatim, expecting a string.
+     * @param {*} data the data to save
+     * @returns {Promise<>} resolves when complete
+     */
+    setBotAccountData(data) {
+        return this.__BotAccountData.destroy({where: {}, truncate: true}).then(() => {
+            var promises = [];
+
+            var keys = _.keys(data);
+            for (var key of keys) {
+                promises.push(this.__BotAccountData.create({key: key, value: data[key]}));
+            }
+
+            return Promise.all(promises);
+        });
     }
 }
 
