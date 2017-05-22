@@ -54,7 +54,7 @@ class OAuthService {
                             log.error("OAuthService", "Error processing authorization attempt");
                             log.error("OAuthService", err);
                             //res.sendStatus(500);
-                            res.redirect("/#/auth/failed");
+                            res.redirect("/auth/failed");
                             return;
                         }
 
@@ -62,7 +62,7 @@ class OAuthService {
                         if (obj["error_message"]) {
                             log.error("OAuthService", "Error processing authorization attempt: " + obj["error_message"]);
                             //res.sendStatus(500);
-                            res.redirect("/#/auth/failed");
+                            res.redirect("/auth/failed");
                             return;
                         }
 
@@ -78,15 +78,15 @@ class OAuthService {
                             log.error("OAuthService", "Error handling auth check");
                             log.error("OAuthService", err);
                             //res.sendStatus(500);
-                            res.redirect("/#/auth/failed");
+                            res.redirect("/auth/failed");
                         }).then(() => {
                             //res.sendStatus(200);
-                            res.redirect("/#/auth/success");
+                            res.redirect("/auth/success");
                         }, err=> {
                             log.error("OAuthService", "Error handling auth check");
                             log.error("OAuthService", err);
                             //res.sendStatus(500);
-                            res.redirect("/#/auth/failed");
+                            res.redirect("/auth/failed");
                         });
                     });
                 })
@@ -94,7 +94,7 @@ class OAuthService {
                 log.error("OAuthService", "Error handling auth check");
                 log.error("OAuthService", err);
                 //res.sendStatus(500);
-                res.redirect("/#/auth/failed");
+                res.redirect("/auth/failed");
             });
         });
 
@@ -139,7 +139,7 @@ class OAuthService {
      * @returns {string} the generated redirect URL
      */
     formatRedirectUrl(sessionId) {
-        return this._baseReturnUrl + "?sessionId=" + sessionId;
+        return this._baseReturnUrl + "/api/v1/auth/check?sessionId=" + sessionId;
     }
 }
 
