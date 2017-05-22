@@ -7,6 +7,8 @@ var PubSub = require("pubsub-js");
 var util = require("./utils.js");
 var WebService = require("./WebService");
 var OAuthService = require("./instagram/OAuthService");
+var _ = require('lodash');
+var AdminRoom = require("./matrix/AdminRoom");
 
 /**
  * The main entry point for the application - bootstraps the bridge
@@ -64,9 +66,15 @@ class InstagramBridge {
 
     run(port) {
         log.info("InstagramBridge", "Starting bridge");
-        return this._bridge.run(port, this._config)
+        return ProfileService.setup(this._config.instagram.rateLimitConfig.profileUpdateFrequency, this._config.instagram.rateLimitConfig.profileCacheTime, this._config.instagram.rateLimitConfig.profileUpdatesPerTick)
+            .then(() => this._bridge.run(port, this._config))
             .then(() => this._updateBotProfile())
-            .then(() => this._bridgeKnownRooms());
+            .then(() => this._bridgeKnownRooms())
+            .catch(error => log.error("InstagramBridge", error));
+    }
+
+    getBot() {
+        return this._bridge.getBot();
     }
 
     getBotIntent() {
@@ -77,6 +85,11 @@ class InstagramBridge {
         var intent = this._bridge.getIntentFromLocalpart("_instagram_" + handle);
         ProfileService.queueProfileCheck(handle); // to make sure their profile is updated
         return intent;
+    }
+
+    isBridgeUser(userId) {
+        var isVirtualUser = userId.indexOf("@_instagram_") === 0 && userId.endsWith(":" + this._bridge.opts.domain);
+        return isVirtualUser || userId == this._bridge.getBot().getUserId();
     }
 
     _updateBotProfile() {
@@ -121,6 +134,7 @@ class InstagramBridge {
         // Update room aspects
         this._bridge.getRoomStore().getEntriesByRemoteRoomData({instagram_username: changes.username}).then(remoteRooms => {
             console.log(remoteRooms);
+            // TODO: Update room aspects
         });
     }
 
@@ -137,12 +151,19 @@ class InstagramBridge {
         return this._bridge.getRoomStore().getLinkedRemoteRooms(roomId).then(remoteRooms => {
             if (remoteRooms.length == 0) {
                 // No remote rooms may mean that this is an admin room
-                var room = this._bridge.getBot().getRoom(roomId);
-                console.log(room);
-                return;
+                return this._bridge.getBot().getJoinedMembers(roomId).then(members => {
+                    var roomMemberIds = _.keys(members);
+                    var botIdx = roomMemberIds.indexOf(this._bridge.getBot().getUserId());
+
+                    if (roomMemberIds.length == 2) {
+                        var otherUserId = roomMemberIds[botIdx == 0 ? 1 : 0];
+                        this._adminRooms[roomId] = new AdminRoom(roomId, this);
+                        log.verbose("InstagramBridge", "Added admin room for user " + otherUserId);
+                    }
+                });
             }
 
-            log.verbose("InstagramBridge", "Room " + roomId + " is bridged to " + remoteRooms.length + " rooms");
+            log.verbose("InstagramBridge", "Room " + roomId + " is bridged to " + remoteRooms.length + " accounts");
             // no other processing required.
         });
     }
@@ -150,7 +171,7 @@ class InstagramBridge {
     _tryProcessAdminEvent(event) {
         var roomId = event.room_id;
 
-        if (this._adminRooms[roomId]) this._adminRooms.handleEvent(event);
+        if (this._adminRooms[roomId]) this._adminRooms[roomId].handleEvent(event);
     }
 
     removeAdminRoom(roomId) {
@@ -163,9 +184,9 @@ class InstagramBridge {
         this._tryProcessAdminEvent(event);
 
         if (event.type === "m.room.member" && event.content.membership === "invite") {
-            if (event.state_key.indexOf("@_instagram_") === 0 && event.state_key.endsWith(":" + this._bridge.opts.domain)) {
+            if (this.isBridgeUser(event.state_key)) {
                 log.info("InstagramBridge", event.state_key + " received invite to room " + event.room_id);
-                return this._bridge.getIntent(event.state_key).join(event.room_id).then(room => this._processRoom(room.roomId));
+                return this._bridge.getIntent(event.state_key).join(event.room_id).then(() => this._processRoom(event.room_id));
             }
         }
 
@@ -257,4 +278,5 @@ class InstagramBridge {
     }
 }
 
-module.exports = InstagramBridge;
+module
+    .exports = InstagramBridge;

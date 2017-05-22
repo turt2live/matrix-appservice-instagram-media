@@ -1,4 +1,5 @@
 var express = require("express");
+var path = require("path");
 
 class WebService {
 
@@ -6,6 +7,11 @@ class WebService {
         this.app = express();
 
         this.app.use(express.static("web-dist"));
+
+        // Register routes for angular app
+        this.app.get(['/auth/*'], (req, res) => {
+            res.sendFile(path.join(__dirname, "..", "web-dist", "index.html"));
+        });
     }
 
     bind(hostname, port) {

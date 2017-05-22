@@ -14,16 +14,16 @@ class ProfileService {
     constructor() {
         this._profiles = {}; // { handle: { accountId, displayName, avatarUrl, expiration } }
         this._updating = false;
-
-        this._loadFromCache();
     }
 
     setup(profileUpdateFrequency, profileCacheTime, profileUpdatesPerTick) {
         this._cacheTime = profileCacheTime;
         this._maxUpdates = profileUpdatesPerTick;
 
-        setInterval(this._checkProfiles.bind(this), profileUpdateFrequency * 60 * 1000);
-        this._checkProfiles();
+        return this._loadFromCache().then(() => {
+            setInterval(this._checkProfiles.bind(this), profileUpdateFrequency * 60 * 1000);
+            this._checkProfiles();
+        });
     }
 
     _checkProfiles() {
@@ -133,7 +133,7 @@ class ProfileService {
     }
 
     _loadFromCache() {
-        InstagramStore.listUsers().then(users => {
+        return InstagramStore.listUsers().then(users => {
             for (var user of users) {
                 this._profiles[user.username] = {
                     accountId: user.accountId,

@@ -29,6 +29,7 @@
     "db-migrate-sqlite3": "^0.2.1",
     "express": "^4.15.0",
     "instagram-api": "^1.0.3",
+    "lodash": "^4.17.4",
     "matrix-appservice-bridge": "^1.3.7",
     "mime": "^1.3.6",
     "moment": "^2.18.1",

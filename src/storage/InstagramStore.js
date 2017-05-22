@@ -41,6 +41,7 @@ class InstagramStore {
 
                 this._orm = new Sequelize(dbConfigEnv.database || 'instagram', dbConfigEnv.username, dbConfigEnv.password, opts);
                 this._bindModels();
+                resolve();
             }, err => {
                 log.error("InstagramStore", err);
                 reject(err);

@@ -32,7 +32,7 @@ class OAuthService {
                 if (!mxid) {
                     log.warn("OAuthService", "Received unknown session ID " + sessionId);
                     //res.sendStatus(400);
-                    res.redirect("/#/auth/failed");
+                    res.redirect("/auth/failed");
                     return;
                 }
 
@@ -72,6 +72,7 @@ class OAuthService {
 
                         log.info("OAuthService", "Auth successful for " + mxid);
 
+                        var handled = false;
                         InstagramStore.getOrCreateUser(username, accountId).then(igUser => {
                             return InstagramStore.saveAuthToken(igUser.id, mxid, authToken);
                         }, err=> {
@@ -79,10 +80,13 @@ class OAuthService {
                             log.error("OAuthService", err);
                             //res.sendStatus(500);
                             res.redirect("/auth/failed");
+                            handled = true;
                         }).then(() => {
+                            if (handled) return;
                             //res.sendStatus(200);
                             res.redirect("/auth/success");
                         }, err=> {
+                            if (handled) return;
                             log.error("OAuthService", "Error handling auth check");
                             log.error("OAuthService", err);
                             //res.sendStatus(500);

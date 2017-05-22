@@ -5,6 +5,10 @@ var path = require("path");
 var InstagramBridge = require("./src/InstagramBridge");
 var InstagramStore = require("./src/storage/InstagramStore");
 
+process.on('unhandledException', e => {
+    console.error(e);
+});
+
 new Cli({
     registrationPath: "appservice-registration-instagram.yaml",
     enableRegistration: true,
@@ -66,7 +70,9 @@ new Cli({
     },
     run: function (port, config, registration) {
         log.init(config);
+        log.info("app", "Preparing database...");
         InstagramStore.prepare().then(() => {
+            log.info("app", "Preparing bridge...");
             var bridge = new InstagramBridge(config, registration);
             bridge.run(port).catch(err => {
                 log.error("Init", "Failed to start bridge");
