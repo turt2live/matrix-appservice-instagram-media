@@ -21,7 +21,13 @@ class MediaHandler {
         this._polling = false;
 
         // This is called after we initiate a request to subscribe, but before we get the all clear on the subscription
-        WebService.app.get('/api/v1/media/push', (req, res) => {
+        WebService.app.get('/api/v1/media/push/:token', (req, res) => {
+            if (!req.params || !req.params['token'] || req.params['token'] !== this._pushToken) {
+                log.warn("MediaHandler", "Received invalid subscription GET authorization: Unknown push token");
+                res.status(400).send("Invalid push token");
+                return;
+            }
+
             var hubMode = req.query['hub.mode'];
             var hubChallenge = req.query['hub.challenge'];
             var hubVerifyToken = req.query['hub.verify_token'];
@@ -45,7 +51,13 @@ class MediaHandler {
             res.status(200).send(hubChallenge);
         });
 
-        WebService.app.post('/api/v1/media/push', (req, res) => {
+        WebService.app.post('/api/v1/media/push/:token', (req, res) => {
+            if (!req.params || !req.params['token'] || req.params['token'] !== this._pushToken) {
+                log.warn("MediaHandler", "Received invalid push: Unknown push token");
+                res.sendStatus(400);
+                return;
+            }
+
             if (!req.body || !_.isArray(req.body)) {
                 log.warn("MediaHandler", "Received invalid push: No body or not an array");
                 res.sendStatus(400);
@@ -95,7 +107,16 @@ class MediaHandler {
      * @param {string} baseUrl the public base URL for the appservice
      */
     prepare(clientId, clientSecret, baseUrl) {
-        this._checkSubscription(clientId, clientSecret, baseUrl);
+        InstagramStore.getBotAccountData().then(accountData => {
+            if (!accountData.mediaHandlerToken) {
+                accountData.mediaHandlerToken = uuid.v4();
+                return InstagramStore.setBotAccountData(accountData).then(() => accountData.mediaHandlerToken);
+            }
+            return accountData.mediaHandlerToken;
+        }).then(token => {
+            this._pushToken = token;
+            this._checkSubscription(clientId, clientSecret, baseUrl);
+        });
 
         setInterval(this._pollAccounts.bind(this), 60 * 1000); // check every 60 seconds
         this._pollAccounts();
@@ -226,7 +247,7 @@ class MediaHandler {
      * @private
      */
     _checkSubscription(clientId, clientSecret, baseUrl) {
-        var cbUrl = baseUrl + "/api/v1/media/push";
+        var cbUrl = baseUrl + "/api/v1/media/push/" + this._pushToken;
 
         log.info("MediaHandler", "Verifying existence of Instagram subscription");
         var requestOpts = {
