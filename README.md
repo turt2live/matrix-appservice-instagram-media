@@ -6,7 +6,7 @@ Bridges Instagram to [[Matrix]](https://matrix.org).
 
 Matrix room: [#instagram:t2bot.io](https://matrix.to/#/#instagram:t2bot.io)
 
-![instagram-bridge](https://t2bot.io/_matrix/media/v1/download/t2l.io/hKeehGStBQJZKmTYaeFdwOSY)
+![instagram-bridge](https://t2bot.io/_matrix/media/v1/download/t2l.io/NoXaWiWBsjtgmjZWmUjJYNfv)
 
 # Requirements
 
