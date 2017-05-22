@@ -14,14 +14,17 @@ Matrix room: [#instagram:t2bot.io](https://matrix.to/#/#instagram:t2bot.io)
 
 # Features
 
-* Current
-  * Nothing
-* Planned
-	* Instagram images automatically posted to rooms
-	* Ability to authenticate to speed up posting
-	* Joining hashtag rooms
-* Not Planned / Not Possible
-	* Matrix to Instagram posting (prohibited by Instagram)
+* [ ] OAuth with Instagram to avoid rate limit problems
+* [ ] Handling of authenticated users (subscribe API) 
+* [ ] Polling of usernames not linked to bridge
+* [ ] Posting media to Matrix rooms
+* [ ] Hashtag rooms - [#4](https://github.com/turt2live/matrix-appservice-instagram/issues/4)
+* [ ] Provisioning API - [#9](https://github.com/turt2live/matrix-appservice-instagram/issues/9)
+* [ ] Stats/Monitoring API - [#10](https://github.com/turt2live/matrix-appservice-instagram/issues/10)
+
+### Things that won't be added
+
+* Matrix to Instagram (prohibited by Instagram)
 
 # Installation
 
