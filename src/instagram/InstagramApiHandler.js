@@ -38,7 +38,7 @@ class InstagramApiHandler {
         };
         return new Promise((resolve, reject) => {
             doCall().then(result => {
-                log.info("InstagramApiHandler", "Rate limit results: " + result.remaining + " remaining of " + result.limit + " (for unknown token)");
+                log.verbose("InstagramApiHandler", "Rate limit results: " + result.remaining + " remaining of " + result.limit + " (for unknown token)");
                 resolve(result.data);
             }, err => {
                 // TODO: Only handle 429
