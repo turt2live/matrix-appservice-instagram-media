@@ -12,31 +12,34 @@ var InstagramApiHandler = require("./InstagramApiHandler");
  */
 class ProfileService {
     constructor() {
-        this._profiles = {}; // { handle: { displayName, avatarUrl, expiration } }
-        this._saving = false;
+        this._profiles = {}; // { handle: { accountId, displayName, avatarUrl, expiration } }
         this._updating = false;
 
         this._loadFromCache();
+    }
 
-        setInterval(this._checkProfiles.bind(this), 30 * 60 * 60 * 1000); // every 30 minutes
+    setup(profileUpdateFrequency, profileCacheTime, profileUpdatesPerTick) {
+        this._cacheTime = profileCacheTime;
+        this._maxUpdates = profileUpdatesPerTick;
+
+        setInterval(this._checkProfiles.bind(this), profileUpdateFrequency * 60 * 1000);
         this._checkProfiles();
     }
 
     _checkProfiles() {
-        if(this._updating) {
+        if (this._updating) {
             log.warn("ProfileService", "Skipping regular check for profiles: Currently doing profile updates");
             return;
         }
 
         this._updating = true;
-        var maxProfiles = 450; // API limit is 600/10min, so we should keep a few for us
 
-        log.info("ProfileService", "Starting profile update check. Finding first " + maxProfiles + " expired profiles");
+        log.info("ProfileService", "Starting profile update check. Finding first " + this._maxUpdates + " expired profiles");
         var expiredProfiles = [];
-        for (var uuid in this._profiles) {
-            var profile = this._profiles[uuid];
+        for (var username in this._profiles) {
+            var profile = this._profiles[username];
             if (profile.expires.isBefore(moment()))
-                expiredProfiles.push({uuid: uuid, profile: profile});
+                expiredProfiles.push({username: username, profile: profile});
         }
         expiredProfiles.sort((a, b) => {
             if (a.profile.expires.isBefore(b.profile.expires))
@@ -47,14 +50,14 @@ class ProfileService {
         });
         log.verbose("ProfileService", expiredProfiles.length + " profiles are expired.");
 
-        expiredProfiles = expiredProfiles.splice(0, maxProfiles); // don't process too much
+        expiredProfiles = expiredProfiles.splice(0, this._maxUpdates); // don't process too much
 
         // Do a promise loop over the profiles to make sure we don't
         // overrun ourselves with a lot of web requests
         var i = 0;
         var nextProfile = () => {
             if (i >= expiredProfiles.length) return Promise.resolve();
-            return this._updateProfile(expiredProfiles[i].uuid);
+            return this._updateProfile(expiredProfiles[i].username);
         };
         nextProfile().then(() => {
             i++;
@@ -62,101 +65,86 @@ class ProfileService {
         });
     }
 
-    _updateProfile(uuid, forceUpdate = false) {
-        log.info("ProfileService", "Updating profile " + uuid + " (force = " + forceUpdate + ")");
-        if (!this._profiles[uuid])
-            this._profiles[uuid] = {displayName: null, expires: moment().add(1, 'hour')};
-        var namePromise = UuidCache.lookupFromUuid(uuid).then(profile => {
-            if (profile.username != this._profiles[uuid].displayName || forceUpdate) {
-                this._profiles[uuid].displayName = profile.displayName;
-                this._profiles[uuid].expires = moment().add(1, 'hour');
-                PubSub.publish("profileUpdate", {changed: 'displayName', profile: this._profiles[uuid], uuid: uuid});
-                this._saveChanges();
-            }
-        });
-        var avatarPromise = this._getProfileImage(uuid).then(response=> {
-            if (response.changed || forceUpdate) {
-                PubSub.publish("profileUpdate", {
-                    changed: 'avatar',
-                    profile: this._profiles[uuid],
-                    newAvatar: response.image,
-                    uuid: uuid
-                });
-                this._profiles[uuid].expires = moment().add(1, 'hour');
-                this._saveChanges();
-            }
-        });
+    _updateProfile(username, forceUpdate = false) {
+        var changed = false;
 
-        return Promise.all([namePromise, avatarPromise]);
+        log.info("ProfileService", "Updating profile " + username + " (force = " + forceUpdate + ")");
+        if (!this._profiles[username]) {
+            this._profiles[username] = {
+                displayName: null,
+                avatarUrl: null,
+                accountId: null,
+                expires: moment().add(this._cacheTime, 'hours')
+            };
+            changed = true; // because it's new
+        }
+
+        var profile = this._profiles[username];
+
+        var igProfilePromise = Promise.resolve(profile.accountId);
+        if (!profile.accountId) {
+            igProfilePromise = InstagramApiHandler.userSearch(username, {}).then(result => {
+                if (!result || result.length !== 1) {
+                    log.warn("ProfileService", "Invalid number of results or bad response trying to look up account ID for " + username);
+                    return null;
+                }
+
+                profile.accountId = result[0].id;
+                changed = true;
+                return profile.accountId;
+            });
+        }
+
+        return igProfilePromise.then(accountId => {
+            if (!accountId) {
+                log.warn("ProfileService", "Unknown account ID for user " + username + "; Skipping update");
+                return null;
+            }
+
+            return InstagramApiHandler.user(accountId);
+        }).then(account => {
+            if (!account) return;
+
+            if (account.profile_picture != profile.avatarUrl) {
+                profile.avatarUrl = account.profile_picture;
+                profile.expires = moment().add(this._cacheTime, 'hours');
+                PubSub.publish("profileUpdate", {changed: 'avatar', profile: profile, username: username});
+                changed = true;
+            }
+
+            if (account.full_name != profile.displayName) {
+                profile.displayName = account.full_name;
+                profile.expires = moment().add(this._cacheTime, 'hours');
+                PubSub.publish("profileUpdate", {changed: 'displayName', profile: profile, username: username});
+                changed = true;
+            }
+
+            if (changed) {
+                return InstagramStore.getOrCreateUser(username, profile.accountId)
+                    .then(user => InstagramStore.updateUser(user.id, profile.displayName, profile.avatarUrl, profile.expires.valueOf()));
+            } else return Promise.resolve();
+        });
     }
 
-    queueProfileCheck(uuid) {
-        if (!this._profiles[uuid])
-            this._updateProfile(uuid, true);
+    queueProfileCheck(username) {
+        if (!this._profiles[username])
+            this._updateProfile(username, true);
         // else the timer will take care of it naturally
     }
 
-    /**
-     * Gets a profile image for a UUID
-     * @param {string} uuid the UUID to lookup
-     * @returns {Promise<{image: Buffer, changed: boolean}>} resolves to profile image information, or rejects if there was an error
-     * @private
-     */
-    _getProfileImage(uuid) {
-        var deferred = Q.defer();
-
-        log.verbose("ProfileService", "Getting image for " + uuid);
-        request('https://crafatar.com/renders/head/' + uuid, {encoding: null}, function (err, response, buffer) {
-            if (err) {
-                deferred.reject(err);
-                return;
+    _loadFromCache() {
+        InstagramStore.listUsers().then(users => {
+            for (var user of users) {
+                this._profiles[user.username] = {
+                    accountId: user.accountId,
+                    displayName: user.displayName,
+                    avatarUrl: user.avatarUrl,
+                    expires: moment(user.profileExpires)
+                }
             }
 
-            var dto = {
-                image: buffer,
-                changed: false
-            };
-
-            if (response.headers['x-storage-type'] === 'downloaded')
-                dto.changed = true;
-
-            log.verbose("ProfileService", "Got profile image for " + uuid + ". Changed = " + dto.changed);
-
-            deferred.resolve(dto);
+            log.info("ProfileService", "Loaded " + users.length + " users from cache");
         });
-
-        return deferred.promise;
-    }
-
-    _saveChanges() {
-        if (this._saving) {
-            log.warn("ProfileService", "Profile service is already saving changes - skipping save call");
-            return;
-        }
-
-        log.info("ProfileService", "Saving cache to disk");
-        this._saving = true;
-        fs.writeFile("profile_cache.json", JSON.stringify(this._profiles), {encoding: 'utf8'}, (err) => {
-            if (err) {
-                log.error("ProfileService", "Error saving cache to disk");
-                log.error("ProfileService", err);
-            } else log.verbose("ProfileService", "Save completed successfully");
-            this._saving = false;
-        });
-    }
-
-    _loadFromCache() {
-        try {
-            var response = fs.readFileSync("profile_cache.json", {encoding: 'utf8'});
-            if (response)this._profiles = JSON.parse(response);
-
-            // Convert dates to moments
-            for (var uuid in this._profiles)
-                this._profiles[uuid].expires = moment(this._profiles[uuid].expires);
-        } catch (e) {
-            if (e.code === 'ENOENT') return; // don't care
-            log.error("ProfileService", e);
-        }
     }
 }
 

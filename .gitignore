@@ -13,6 +13,8 @@ instagram-production.db
 room-store.db
 user-store.db
 
+db/*.db
+
 web-dist/
 
 # Logs

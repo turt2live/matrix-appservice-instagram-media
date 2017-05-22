@@ -150,6 +150,31 @@ class InstagramStore {
     getRandomAuthToken() {
         return this.__UserOAuthTokens.findOne({order: [[Sequelize.fn('RANDOM', '')]]}).then(auth => auth.token);
     }
+
+    /**
+     * Updates a user's profile information
+     * @param {number} userId the user ID to update
+     * @param {string} displayName the display name to save
+     * @param {string} avatarUrl the avatar url to save
+     * @param {number} expirationTime the expiration time for the profile information
+     * @returns {Promise<>} resolves when complete
+     */
+    updateUser(userId, displayName, avatarUrl, expirationTime) {
+        return this.__Users.findById(userId).then(user => {
+            user.displayName = displayName;
+            user.avatarUrl = avatarUrl;
+            user.profileExpires = expirationTime;
+            return user.save();
+        });
+    }
+
+    /**
+     * Gets all the known users
+     * @returns {Promise<User[]>} resolves to an array of all known users
+     */
+    listUsers() {
+        return this.__Users.findAll().then(users => users.map(u => new User(u)));
+    }
 }
 
 function timestamp(val) {

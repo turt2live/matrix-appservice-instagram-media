@@ -109,19 +109,19 @@ class InstagramBridge {
     }
 
     _onProfileUpdate(topic, changes) {
-        var intent = this.getIgUserIntent(changes.uuid);
+        // Update user aspects
+        var intent = this.getIgUserIntent(changes.username);
         if (changes.changed == 'displayName') {
             intent.setDisplayName(changes.profile.displayName + " (Instagram)");
         } else if (changes.changed == 'avatar') {
-            intent.getClient().uploadContent({
-                rawResponse: false,
-                stream: changes.newAvatar,
-                name: changes.uuid,
-                type: 'image/png' // assumed - probably a bad idea
-            }).then(response => intent.setAvatarUrl(response.content_uri));
+            util.uploadContentFromUrl(this._bridge, changes.profile.avatarUrl, intent, 'profile.png')
+                .then(mxcUrl => intent.setAvatarUrl(mxcUrl));
         } else log.warn("InstagramBridge", "Unrecongized profile update: " + changes.changed);
 
-        // TODO: Update room aspects
+        // Update room aspects
+        this._bridge.getRoomStore().getEntriesByRemoteRoomData({instagram_username: changes.username}).then(remoteRooms => {
+            console.log(remoteRooms);
+        });
     }
 
     _bridgeKnownRooms() {
@@ -136,14 +136,14 @@ class InstagramBridge {
         log.info("InstagramBridge", "Request to bridge room " + roomId);
         return this._bridge.getRoomStore().getLinkedRemoteRooms(roomId).then(remoteRooms => {
             if (remoteRooms.length == 0) {
-                log.warn("InstagramBridge", "No remote rooms for room " + roomId + ": Skipping bridge");
+                // No remote rooms may mean that this is an admin room
+                var room = this._bridge.getBot().getRoom(roomId);
+                console.log(room);
                 return;
             }
 
-            for (var room of remoteRooms) {
-                // TODO: Actually do bridge
-
-            }
+            log.verbose("InstagramBridge", "Room " + roomId + " is bridged to " + remoteRooms.length + " rooms");
+            // no other processing required.
         });
     }
 
