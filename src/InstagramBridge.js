@@ -170,8 +170,15 @@ class InstagramBridge {
 
         // Update room aspects
         this._bridge.getRoomStore().getEntriesByRemoteRoomData({instagram_username: changes.username}).then(remoteRooms => {
-            console.log(remoteRooms);
-            // TODO: Update room aspects
+            for (var entry of remoteRooms) {
+                var roomId = entry.matrix.roomId;
+                if (changes.changed == 'avatar') {
+                    util.uploadContentFromUrl(this._bridge, changes.profile.avatarUrl, intent, 'profile.png')
+                        .then(mxcUrl => this.getBotIntent().setRoomAvatar(roomId, mxcUrl, {}));
+                } else if (changes.changed == 'displayName') {
+                    this.getBotIntent().setRoomName(roomId, "[Instagram] " + changes.profile.displayName);
+                }
+            }
         });
     }
 
