@@ -8,10 +8,14 @@ var request = require('request');
 var _ = require("lodash");
 
 /**
- * Handles incoming media from Instagram using various methods
+ * Handles incoming media from Instagram. Supports subscriptions and polling to ensure all known
+ * users/accounts are covered.
  */
 class MediaHandler {
 
+    /**
+     * Creates a new media handler. Prepares the web endpoints and initial setup. Call `prepare` before use.
+     */
     constructor() {
         this._expectedTokens = [];
         this._polling = false;
@@ -60,6 +64,10 @@ class MediaHandler {
         this._pollAccounts();
     }
 
+    /**
+     * Polls for account updates. Does not run checks on accounts expected through the subscription API.
+     * @private
+     */
     _pollAccounts() {
         if (this._polling) {
             log.warn("MediaHandler", "A poll is currently in progress: Skipping check");
@@ -108,6 +116,14 @@ class MediaHandler {
         });
     }
 
+    /**
+     * Checks for new media on a given account
+     * @param {string} accountId the account ID to check
+     * @param {number} userId the bridge's user ID for the account
+     * @param {string} username the username for the account
+     * @return {Promise<>} resolves when the media check is complete
+     * @private
+     */
     _checkMedia(accountId, userId, username) {
         var newMedia = [];
         var post;
@@ -157,6 +173,13 @@ class MediaHandler {
         });
     }
 
+    /**
+     * Checks to ensure the Instagram subscription for receiving authenticated media exists
+     * @param {string} clientId the Instagram client ID
+     * @param {string} clientSecret the Instagram client secret
+     * @param {string} baseUrl the base URL to post media to
+     * @private
+     */
     _checkSubscription(clientId, clientSecret, baseUrl) {
         log.info("MediaHandler", "Verifying existence of Instagram subscription");
         var requestOpts = {

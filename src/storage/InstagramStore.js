@@ -8,6 +8,9 @@ var dbConfig = require("../../config/database.json");
  */
 class InstagramStore {
 
+    /**
+     * Creates a new Instagram store. Call `prepare` before use.
+     */
     constructor() {
         this._orm = null;
     }
@@ -52,6 +55,10 @@ class InstagramStore {
         });
     }
 
+    /**
+     * Binds all of the models to the ORM.
+     * @private
+     */
     _bindModels() {
         // Models
         this.__Users = this._orm.import(__dirname + "/models/users");
@@ -254,6 +261,11 @@ class InstagramStore {
     }
 }
 
+/**
+ * Converts a database value to a millisecond timestamp
+ * @param {*} val the value from the database
+ * @return {number} a millisecond timestamp representing the date
+ */
 function timestamp(val) {
     if (typeof(val) === 'number') {
         return val;
@@ -264,6 +276,9 @@ function timestamp(val) {
     } else return val;
 }
 
+/**
+ * Represents a User from the database.
+ */
 class User {
     constructor(dbFields) {
         this.id = dbFields.id;

@@ -7,14 +7,26 @@ var InstagramStore = require("./../storage/InstagramStore");
 var InstagramApiHandler = require("./InstagramApiHandler");
 
 /**
- * Represents a profile service for Instagram users
+ * Represents a profile service for Instagram users. Keeps track of profile data, and runs a timer
+ * to update this information periodically.
  */
 class ProfileService {
+
+    /**
+     * Creates a new Instagram profile service. Call `prepare` before use.
+     */
     constructor() {
         this._profiles = {}; // { handle: { accountId, displayName, avatarUrl, expiration } }
         this._updating = false;
     }
 
+    /**
+     * Prepares the profile service for use. This sets up the timer and starts caching information.
+     * @param {number} profileUpdateFrequency how often, in minutes, to perform a profile update check
+     * @param {number} profileCacheTime how long, in hours, profile data is cached before re-checked
+     * @param {number} profileUpdatesPerTick how many accounts maximum are updated per check
+     * @return {Promise<>} resolves when complete
+     */
     prepare(profileUpdateFrequency, profileCacheTime, profileUpdatesPerTick) {
         this._cacheTime = profileCacheTime;
         this._maxUpdates = profileUpdatesPerTick;
@@ -25,6 +37,10 @@ class ProfileService {
         });
     }
 
+    /**
+     * Polls for profile updates. Only checks the most expired profiles up to the user-supplied maximum.
+     * @private
+     */
     _checkProfiles() {
         if (this._updating) {
             log.warn("ProfileService", "Skipping regular check for profiles: Currently doing profile updates");
@@ -68,6 +84,13 @@ class ProfileService {
         });
     }
 
+    /**
+     * Updates a profile. Optionally forcing an upgrade on the spot
+     * @param {string} username the Instagram username to update
+     * @param {boolean} [forceUpdate] if true, the profile will be updated regardless of expiration
+     * @return {Promise<>} resolves when the profile update check is complete
+     * @private
+     */
     _updateProfile(username, forceUpdate = false) {
         var changed = false;
 
@@ -129,12 +152,22 @@ class ProfileService {
         });
     }
 
+    /**
+     * Queues a profile check for a given Instagram user
+     * @param {string} username the Instagram username to queue for an update
+     */
     queueProfileCheck(username) {
         if (!this._profiles[username])
             this._updateProfile(username, true);
         // else the timer will take care of it naturally
     }
 
+    /**
+     * Retrieves the profile for an Instagram user. This will try to use the cache where possible,
+     * only getting live data if it must.
+     * @param {string} username the Instagram username to get the profile of
+     * @return {Promise<{username: string, displayName: string, avatarUrl: string}>} resolves to the profile of the user
+     */
     getProfile(username) {
         if (this._profiles[username]) {
             return Promise.resolve(this._profiles[username]);
@@ -143,6 +176,11 @@ class ProfileService {
         }
     }
 
+    /**
+     * Loads all known users into the profile cache for queued updates
+     * @return {Promise<>} resolves when the cache has been populated
+     * @private
+     */
     _loadFromCache() {
         return InstagramStore.listUsers().then(users => {
             for (var user of users) {
@@ -159,5 +197,4 @@ class ProfileService {
     }
 }
 
-var service = new ProfileService();
-module.exports = service;
+module.exports = new ProfileService();

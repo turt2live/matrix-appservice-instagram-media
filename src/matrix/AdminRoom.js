@@ -1,6 +1,12 @@
 var _ = require("lodash");
 var OAuthService = require("./../instagram/OAuthService");
 
+/**
+ * Processes user-admin related functions in Matrix. For example, this will allow
+ * the Matrix user to authenticate with the bridge.
+ *
+ * An admin room must be comprised of 2 people: the bridge bot and the human.
+ */
 class AdminRoom {
 
     /**
@@ -43,6 +49,12 @@ class AdminRoom {
         }
     }
 
+    /**
+     * Processes a message from the human in the room
+     * @param {string} sender the sender of the message
+     * @param {string} message the plain text message body
+     * @private
+     */
     _processMessage(sender, message) {
         if (message == "!auth") {
             OAuthService.generateAuthUrl(sender).then(url => {

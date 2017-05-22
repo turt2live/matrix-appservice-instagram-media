@@ -10,7 +10,7 @@ var log = require("./../util/LogService");
 class OAuthService {
 
     /**
-     * Creates a new OAuth service. Call `prepare` before use
+     * Creates a new OAuth service. Call `prepare` before use.
      */
     constructor() {
     }

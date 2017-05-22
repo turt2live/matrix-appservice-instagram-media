@@ -5,10 +5,6 @@ var path = require("path");
 var InstagramBridge = require("./src/InstagramBridge");
 var InstagramStore = require("./src/storage/InstagramStore");
 
-process.on('unhandledException', e => {
-    console.error(e);
-});
-
 new Cli({
     registrationPath: "appservice-registration-instagram.yaml",
     enableRegistration: true,

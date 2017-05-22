@@ -1,8 +1,15 @@
 var express = require("express");
 var path = require("path");
 
+/**
+ * Primary web handler for the bridge. Serves the front end and exposes a way for other services
+ * to provide endpoints.
+ */
 class WebService {
 
+    /**
+     * Creates a new web service. Call `bind` before use.
+     */
     constructor() {
         this.app = express();
 
@@ -14,6 +21,11 @@ class WebService {
         });
     }
 
+    /**
+     * Binds the web service to a hostname and port
+     * @param {string} hostname the hostname to bind to
+     * @param {number} port the port to bind on
+     */
     bind(hostname, port) {
         this.app.listen(port, hostname);
     }

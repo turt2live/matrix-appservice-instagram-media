@@ -5,10 +5,14 @@ var log = require("./../util/LogService");
 const MAX_RETRY_COUNT = 5; // arbitrary
 
 /**
- * Handles proxying of API calls to help reduce the chance of rate limiting
+ * Handles proxying of API calls to help reduce the chance of rate limiting. This is achieved by using
+ * a random OAuth token to perform the request, retrying if required up to a maximum.
  */
 class InstagramApiHandler {
 
+    /**
+     * Creates a new Instagram API Handler.
+     */
     constructor() {
     }
 

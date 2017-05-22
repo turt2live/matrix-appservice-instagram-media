@@ -68,35 +68,62 @@ class InstagramBridge {
         PubSub.subscribe('newMedia', this._onMedia.bind(this));
     }
 
+    /**
+     * Starts the bridge on the defined port
+     * @param {number} port the port to run the bridge on
+     * @return {Promise<>} resolves when the bridge has started
+     */
     run(port) {
         log.info("InstagramBridge", "Starting bridge");
         return ProfileService.prepare(this._config.instagram.rateLimitConfig.profileUpdateFrequency, this._config.instagram.rateLimitConfig.profileCacheTime, this._config.instagram.rateLimitConfig.profileUpdatesPerTick)
-            .then(() => MediaHandler.prepare(this._config.instagram.clientId, this._config.instagram.clientSecret, this._config.instagram.publicUrlBase, this._config.instagram.rateLimitConfig.mediaCheckFrequency))
+            .then(() => MediaHandler.prepare(this._config.instagram.clientId, this._config.instagram.clientSecret, this._config.instagram.publicUrlBase))
             .then(() => this._bridge.run(port, this._config))
             .then(() => this._updateBotProfile())
             .then(() => this._bridgeKnownRooms())
             .catch(error => log.error("InstagramBridge", error));
     }
 
+    /**
+     * Gets the bridge bot powering the bridge
+     * @return {AppServiceBot} the bridge bot
+     */
     getBot() {
         return this._bridge.getBot();
     }
 
+    /**
+     * Gets the bridge bot as an intent
+     * @return {Intent} the bridge bot
+     */
     getBotIntent() {
         return this._bridge.getIntent(this._bridge.getBot().getUserId());
     }
 
+    /**
+     * Gets the intent for an Instagram virtual user
+     * @param {string} handle the Instagram username
+     * @return {Intent} the virtual user intent
+     */
     getIgUserIntent(handle) {
         var intent = this._bridge.getIntentFromLocalpart("_instagram_" + handle);
         ProfileService.queueProfileCheck(handle); // to make sure their profile is updated
         return intent;
     }
 
+    /**
+     * Determines if a user is a bridge user (either the bot or virtual)
+     * @param {string} userId the user ID to check
+     * @return {boolean} true if the user ID is a bridge user, false otherwise
+     */
     isBridgeUser(userId) {
         var isVirtualUser = userId.indexOf("@_instagram_") === 0 && userId.endsWith(":" + this._bridge.opts.domain);
         return isVirtualUser || userId == this._bridge.getBot().getUserId();
     }
 
+    /**
+     * Updates the bridge bot's appearance in matrix
+     * @private
+     */
     _updateBotProfile() {
         log.info("InstagramBridge", "Updating appearance of bridge bot");
 
@@ -126,6 +153,12 @@ class InstagramBridge {
         });
     }
 
+    /**
+     * Called when a profile has been updated
+     * @param {string} topic the event name
+     * @param {{username: string, profile: {avatarUrl:string, displayName:string}, changed: string}} changes the changes made to the profile
+     * @private
+     */
     _onProfileUpdate(topic, changes) {
         // Update user aspects
         var intent = this.getIgUserIntent(changes.username);
@@ -143,6 +176,12 @@ class InstagramBridge {
         });
     }
 
+    /**
+     * Called when new media has been encountered
+     * @param {string} topic the event name
+     * @param {{media:{type:string, content:{url:string, width: number, height:number}}[],username:string,caption:string,sourceUrl:string,postId:string,userId:number}} media the media that was encountered
+     * @private
+     */
     _onMedia(topic, media) {
         var userIntent = this.getIgUserIntent(media.username);
 
@@ -164,6 +203,17 @@ class InstagramBridge {
         });
     }
 
+    /**
+     * Posts media to a given matrix room
+     * @param {string} roomId the matrix room ID
+     * @param {string} content the media content
+     * @param {string} postId the media ID
+     * @param {Intent} intent the intent to post as
+     * @param {string} caption the caption for the media
+     * @param {number} userId the bridge user ID
+     * @param {string} sourceUrl the source of the media
+     * @private
+     */
     _postMedia(roomId, content, postId, intent, caption, userId, sourceUrl) {
         var contentPromises = [];
         var eventIds = [];
@@ -207,11 +257,26 @@ class InstagramBridge {
         });
     }
 
+    /**
+     * Uploads media to a room
+     * @param {{media:{type:string, content:{url:string, width: number, height:number}}[],username:string,caption:string,sourceUrl:string,postId:string,userId:number}} mediaContainer media container
+     * @param {{container:{media:{type:string, content:{url:string, width: number, height:number}}[],username:string,caption:string,sourceUrl:string,postId:string,userId:number},mxc:string}[]} urls uploaded media urls array
+     * @param {string} postId the post ID
+     * @return {Promise<>} resolves when upload has been completed
+     * @private
+     */
     _uploadMedia(mediaContainer, urls, postId) {
         return util.uploadContentFromUrl(this._bridge, mediaContainer.content.url, this.getBotIntent(), "igmedia-" + postId + "." + (mediaContainer.type == 'video' ? 'mp4' : 'jpg'))
             .then(mxcUrl => urls.push({container: mediaContainer, mxc: mxcUrl}));
     }
 
+    /**
+     * Get all joined rooms for an Intent
+     * @param {Intent} intent the intent to get joined rooms of
+     * @return {Promise<string[]>} resolves to an array of room IDs the intent is participating in
+     * @private
+     * @deprecated This is a hack
+     */
     // HACK: The js-sdk doesn't support this endpoint. See https://github.com/matrix-org/matrix-js-sdk/issues/440
     _getClientRooms(intent) {
         // Borrowed from matrix-appservice-bridge: https://github.com/matrix-org/matrix-appservice-bridge/blob/435942dd32e2214d3aa318503d19b10b40c83e00/lib/components/app-service-bot.js#L34-L47
@@ -222,6 +287,10 @@ class InstagramBridge {
             });
     }
 
+    /**
+     * Updates the bridge information on all rooms the bridge bot participates in
+     * @private
+     */
     _bridgeKnownRooms() {
         this._bridge.getBot().getJoinedRooms().then(rooms => {
             for (var roomId of rooms) {
@@ -230,6 +299,13 @@ class InstagramBridge {
         });
     }
 
+    /**
+     * Attempts to determine if a room is a bridged room or an admin room, based on the membership and other
+     * room information. This will categorize the room accordingly and prepare it for it's purpose.
+     * @param {string} roomId the matrix room ID to process
+     * @return {Promise<>} resolves when processing is complete
+     * @private
+     */
     _processRoom(roomId) {
         log.info("InstagramBridge", "Request to bridge room " + roomId);
         return this._bridge.getRoomStore().getLinkedRemoteRooms(roomId).then(remoteRooms => {
@@ -252,16 +328,31 @@ class InstagramBridge {
         });
     }
 
+    /**
+     * Tries to find an appropriate admin room to send the given event to. If an admin room cannot be found,
+     * this will do nothing.
+     * @param {MatrixEvent} event the matrix event to send to any reasonable admin room
+     * @private
+     */
     _tryProcessAdminEvent(event) {
         var roomId = event.room_id;
 
         if (this._adminRooms[roomId]) this._adminRooms[roomId].handleEvent(event);
     }
 
+    /**
+     * Destroys an admin room. This will not cause the bridge bot to leave. It will simply de-categorize it.
+     * The room may be unintentionally restored when the bridge restarts, depending on the room conditions.
+     * @param {string} roomId the room ID to destroy
+     */
     removeAdminRoom(roomId) {
         this._adminRooms[roomId] = null;
     }
 
+    /**
+     * Bridge handler for generic events
+     * @private
+     */
     _onEvent(request, context) {
         var event = request.getData();
 
@@ -278,10 +369,18 @@ class InstagramBridge {
         return Promise.resolve();
     }
 
+    /**
+     * Bridge handler for when a room is created from an alias
+     * @private
+     */
     _onAliasQueried(alias, roomId) {
         return this._processRoom(roomId); // start the bridge to the room
     }
 
+    /**
+     * Bridge handler for creating a room from an alias
+     * @private
+     */
     _onAliasQuery(alias, aliasLocalpart) {
         log.info("InstagramBridge", "Got request for alias #" + aliasLocalpart);
 
@@ -355,6 +454,10 @@ class InstagramBridge {
         });
     }
 
+    /**
+     * Bridge handler to update/create user information
+     * @private
+     */
     _onUserQuery(matrixUser) {
         // Avatar and name will eventually make it back to us from the profile service.
         var handle = matrixUser.localpart.substring('_instagram_'.length); // no dashes in uuid
@@ -365,5 +468,4 @@ class InstagramBridge {
     }
 }
 
-module
-    .exports = InstagramBridge;
+module.exports = InstagramBridge;
