@@ -126,6 +126,15 @@ class InstagramStore {
     }
 
     /**
+     * Gets an Instagram user from their account ID
+     * @param {string} accountId the account ID to lookup
+     * @return {Promise<User>} resolves to the found user, or null if not found
+     */
+    findUserByAccountId(accountId) {
+        return this.__Users.find({where: {accountId: accountId}}).then(user => user ? new User(user) : null);
+    }
+
+    /**
      * Saves an Instagram OAuth token for a user
      * @param {number} userId the user ID
      * @param {string} mxId the Matrix User ID the token is intended for

@@ -46,8 +46,45 @@ class MediaHandler {
         });
 
         WebService.app.post('/api/v1/media/push', (req, res) => {
-            console.log(req.body);
-            res.sendStatus(200); // so we don't leave them hanging
+            if (!req.body || !_.isArray(req.body)) {
+                log.warn("MediaHandler", "Received invalid push: No body or not an array");
+                res.sendStatus(400);
+                return;
+            }
+
+            var promises = [];
+            for (var mediaPush of req.body) {
+                promises.push(this._processPostedMedia(mediaPush));
+            }
+
+            Promise.all(promises).then(() => res.sendStatus(200));
+        });
+    }
+
+    /**
+     * Attempts to process some posted media object
+     * @param {*} mediaPush the media that was posted
+     * @returns {Promise<>} resolves when the media has been processed
+     * @private
+     */
+    _processPostedMedia(mediaPush) {
+        var accountId = mediaPush["object_id"];
+        var mediaId = mediaPush["data"]["media_id"];
+        var userId = 0;
+        var username = "";
+
+        log.info("MediaHandler", "Starting processing on " + accountId + "'s media post: " + mediaId);
+
+        return InstagramStore.findUserByAccountId(accountId).then(user => {
+            userId = user.id;
+            username = user.username;
+            return InstagramApiHandler.media(mediaId);
+        }).then(media => {
+            if (!media) {
+                log.error("MediaHandler", "Could not find media " + mediaId);
+                return Promise.resolve();
+            }
+            return this._tryPostMedia(media, username, userId);
         });
     }
 
@@ -125,48 +162,56 @@ class MediaHandler {
      * @private
      */
     _checkMedia(accountId, userId, username) {
-        var newMedia = [];
-        var post;
         return InstagramApiHandler.userMedia(accountId, {count: 1}).then(media => {
-            newMedia = media;
-            if (!newMedia || newMedia.length == 0) {
+            if (!media || media.length == 0) {
                 log.info("MediaHandler", "No new media found for " + username);
-                return Promise.resolve(true); // fake the fact that it is handled because there is no media
+                return Promise.resolve();
             }
 
-            post = media[0];
-            return InstagramStore.isMediaHandled(post['id']);
-        }).then(isHandled => {
+            return this._tryPostMedia(media[0], username, userId);
+        });
+    }
+
+    /**
+     * Attempts to post the Instagram media to the bridge
+     * @param {*} media the media object
+     * @param {string} username the instagram username
+     * @param {number} userId the bridge user ID
+     * @return {Promise<>} resolves when processing is complete
+     * @private
+     */
+    _tryPostMedia(media, username, userId) {
+        return InstagramStore.isMediaHandled(media['id']).then(isHandled => {
             if (isHandled) {
-                log.silly("MediaHandler", "Duplicate media ID: " + post['id']);
+                log.silly("MediaHandler", "Duplicate media ID: " + media['id']);
                 return;
             }
 
             var contentArray = [];
             var pushContent = (type, content) => contentArray.push({type: type, content: content});
 
-            if (post['type'] == 'image') {
-                pushContent('image', post['images']['standard_resolution']);
-            } else if (post['type'] == 'video') {
-                pushContent('video', post['videos']['standard_resolution']);
-            } else if (post['type'] == 'carousel') {
-                for (var slide of post['carousel_media']) {
+            if (media['type'] == 'image') {
+                pushContent('image', media['images']['standard_resolution']);
+            } else if (media['type'] == 'video') {
+                pushContent('video', media['videos']['standard_resolution']);
+            } else if (media['type'] == 'carousel') {
+                for (var slide of media['carousel_media']) {
                     if (slide['type'] == 'image') {
                         pushContent('image', slide['images']['standard_resolution']);
                     } else if (slide['type'] == 'video') {
                         pushContent('video', slide['videos']['standard_resolution']);
                     } else log.warn("MediaHandler", "Unknown media type " + slide['type'] + " in carousel");
                 }
-            } else log.warn("MediaHandler", "Unknown media type " + post['type'] + " for post");
+            } else log.warn("MediaHandler", "Unknown media type " + media['type'] + " for post");
 
             if (contentArray.length > 0) {
-                log.info("MediaHandler", "Post " + post['id'] + " has " + contentArray.length + " attachments");
+                log.info("MediaHandler", "Post " + media['id'] + " has " + contentArray.length + " attachments");
                 PubSub.publish('newMedia', {
                     media: contentArray, // [{ type, content: { url, width, height }}]
                     username: username,
-                    caption: post['caption'] ? post['caption']['text'] : null,
-                    sourceUrl: post['link'],
-                    postId: post['id'],
+                    caption: media['caption'] ? media['caption']['text'] : null,
+                    sourceUrl: media['link'],
+                    postId: media['id'],
                     userId: userId
                 });
             }
@@ -181,6 +226,8 @@ class MediaHandler {
      * @private
      */
     _checkSubscription(clientId, clientSecret, baseUrl) {
+        var cbUrl = baseUrl + "/api/v1/media/push";
+
         log.info("MediaHandler", "Verifying existence of Instagram subscription");
         var requestOpts = {
             method: 'GET',
@@ -198,7 +245,7 @@ class MediaHandler {
             }
 
             var obj = JSON.parse(body);
-            if (obj["error_message"]) {
+            if (obj["meta"]["error_message"]) {
                 log.error("MediaHandler", "Error checking for subscriptions. Not processing authenticated media.");
                 log.error("MediaHandler", obj["error_message"]);
                 return;
@@ -206,7 +253,7 @@ class MediaHandler {
 
             var hasSubscription = false;
             for (var subscription of obj["data"]) {
-                if (subscription.callback_url == baseUrl + "/api/v1/media/push" && subscription.type == "subscription"
+                if (subscription.callback_url == cbUrl && subscription.type == "subscription"
                     && subscription.object == 'user' && subscription.aspect == 'media') {
                     hasSubscription = true;
                     break;
@@ -216,17 +263,19 @@ class MediaHandler {
             if (hasSubscription) {
                 log.info("MediaHandler", "Subscription to media exists: Not creating.");
             } else {
+                log.info("MediaHandler", "Creating subscription to user media");
                 var token = uuid.v4();
                 this._expectedTokens.push(token);
                 requestOpts = {
-                    url: 'https://api.instagram.com/v1/subscriptions/',
+                    url: 'https://api.instagram.com/v1/subscriptions',
                     method: 'POST',
                     form: {
-                        client_id: this._clientId,
-                        client_secret: this._clientSecret,
+                        client_id: clientId,
+                        client_secret: clientSecret,
                         object: 'user',
                         aspect: 'media',
-                        verify_token: token
+                        verify_token: token,
+                        callback_url: cbUrl
                     }
                 };
                 request(requestOpts, (err, response, body) => {
@@ -237,9 +286,9 @@ class MediaHandler {
                     }
 
                     var obj = JSON.parse(body);
-                    if (obj["error_message"]) {
+                    if (obj["meta"]["error_message"]) {
                         log.error("MediaHandler", "Error checking for subscriptions. Not processing authenticated media.");
-                        log.error("MediaHandler", obj["error_message"]);
+                        log.error("MediaHandler", obj["meta"]["error_message"]);
                         return;
                     }
 

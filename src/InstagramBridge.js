@@ -248,12 +248,15 @@ class InstagramBridge {
         }
 
         Promise.all(contentPromises).then(() => {
+            if (!caption) return Promise.resolve();
+
             return intent.sendMessage(roomId, {
                 msgtype: "m.text",
                 body: caption,
                 external_url: sourceUrl
             });
         }).then(event => {
+            if (!event) return Promise.resolve();
             eventIds.push(event.event_id);
         }).then(() => {
             for (var eventId of eventIds) {

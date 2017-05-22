@@ -1,5 +1,6 @@
 var express = require("express");
 var path = require("path");
+var bodyParser = require('body-parser');
 
 /**
  * Primary web handler for the bridge. Serves the front end and exposes a way for other services
@@ -14,6 +15,7 @@ class WebService {
         this.app = express();
 
         this.app.use(express.static("web-dist"));
+        this.app.use(bodyParser.json());
 
         // Register routes for angular app
         this.app.get(['/auth/*'], (req, res) => {
