@@ -22,10 +22,13 @@ The appservice will automatically process information received from Instagram fo
 Yes. To opt out of having your account accessible on matrix, open a new "private chat" with the appservice user on matrix (`@_instagram:t2bot.io`) and send the message `!delist`. The bot may prompt you to authorize it to access your account - this is to ensure that you have permission to access the Instagram account before automatically delisting it. 
 
 The following actions happen when your account is delisted from the appservice:
-* All of the users in the room that has your Instagram data in it will be kicked
-* All of the media posted by the appservice from your Instagram account will be redacted
-  * *Note*: The appservice cannot delete your data reliably - the distributed system by nature does not permit delete operations, only hide
-* The room that was bridged to your Instagram account will be set to Invite Only and hidden where possible
+* All of the users in the room dedicated to your Instagram account will be kicked.
+* The room dedicated to your Instagram account will be set to Invite Only and hidden where possible.
+* All copies of your media/posts will be redacted in all rooms, where possible.
+  * The bridge will attempt to tell you if any content could not be removed.
+  * *Note*: The appservice cannot delete your data reliably - a distributed system by nature does not permit delete operations, only hide.
+
+Authorizing (`!auth`) after issuing `!delist` will cause your account to no longer be removed, and people will be allowed to see your media on Matrix.
 
 ## How will my media be used?
 
