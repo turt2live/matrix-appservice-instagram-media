@@ -7,6 +7,11 @@ var Buffer = require("buffer").Buffer;
 var log = require('./LogService');
 var mime = require('mime');
 var parseDataUri = require("parse-data-uri");
+var request = require('request');
+var fs = require('fs');
+var mkdirp = require('mkdirp');
+var uuid = require("uuid");
+var path = require('path');
 
 /**
  Utility module for regularly used functions.
@@ -110,7 +115,44 @@ function uploadContentFromDataUri(bridge, id, uri, name) {
     });
 }
 
+/**
+ * Downloads a file from a web address to the file system
+ * @param {string} uri the web resource to download
+ * @param {string} path the filesystem path to download to
+ * @returns {Promise<boolean>} resolves with true if successful, false otherwise
+ */
+function downloadFile(uri, path) {
+    return new Promise((resolve, reject) => {
+        var resolved = false;
+        request(uri, (err, response, body) => {
+            if (err) {
+                resolved = true;
+                resolve(false);
+            }
+        }).pipe(fs.createWriteStream(path)).on('close', () => {
+            if (!resolved) resolve(true);
+        });
+    });
+}
+
+/**
+ * Downloads a file from a web address to the file system
+ * @param {string} uri the web resource to download
+ * @param {string} [ext] optional extension for the filename
+ * @returns {Promise<string>} resolves to the file path, or null if something went wrong
+ */
+function downloadFileTemp(uri, ext = '.data') {
+    var root = "temp";
+    var filename = uuid.v4() + ext;
+    var fullpath = path.join(root, filename);
+
+    mkdirp.sync(root);
+    return downloadFile(uri, fullpath).then(created => created ? fullpath : null);
+}
+
 module.exports = {
     uploadContentFromUrl: uploadContentFromUrl,
-    uploadContentFromDataUri: uploadContentFromDataUri
+    uploadContentFromDataUri: uploadContentFromDataUri,
+    downloadFile: downloadFile,
+    downloadFileTemp: downloadFileTemp,
 };

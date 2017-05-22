@@ -5,6 +5,8 @@ var moment = require('moment');
 var fs = require("fs");
 var InstagramStore = require("./../storage/InstagramStore");
 var InstagramApiHandler = require("./InstagramApiHandler");
+var utils = require("../util/utils.js");
+var resemble = require('node-resemble-js');
 
 /**
  * Represents a profile service for Instagram users. Keeps track of profile data, and runs a timer
@@ -131,20 +133,59 @@ class ProfileService {
         }).then(account => {
             if (!account) return;
 
+            var aspectPromises = [];
+
             if (account.profile_picture != profile.avatarUrl || forceUpdate) {
-                profile.avatarUrl = account.profile_picture;
-                profile.expires = moment().add(this._cacheTime, 'hours');
-                PubSub.publish("profileUpdate", {changed: 'avatar', profile: profile, username: username});
-                changed = true;
+                log.verbose("ProfileService", "Avatar difference for " + username + ". " + (forceUpdate ? "Taking image blindly" : "Checking for image difference"));
+                var updatePromise = Promise.resolve(/*doUpdate:*/true);
+                if (!forceUpdate) {
+                    var currentProfileTempFile = "";
+                    var desiredProfileTempFile = "";
+
+                    updatePromise = Promise.all([
+                        utils.downloadFileTemp(profile.avatarUrl, '.jpg').then(filepath => currentProfileTempFile = filepath),
+                        utils.downloadFileTemp(account.profile_picture, '.jpg').then(filepath => desiredProfileTempFile = filepath)
+                    ]).then(() => {
+                        return new Promise((resolve, reject) => {
+                            resemble(currentProfileTempFile).compareTo(desiredProfileTempFile).onComplete(resolve);
+                        });
+                    }).then(result => {
+                        if (!result.isSameDimensions) return true; // different dimensions are automatically an update
+                        if (result.misMatchPercentage > 1) return true; // update if 1% or more different
+                        return false;
+                    }).then(doUpdate => {
+                        try {
+                            fs.unlink(currentProfileTempFile);
+                            fs.unlink(desiredProfileTempFile);
+                        } catch (ignored) {
+                            // consume all errors - we don't care
+                        }
+
+                        return doUpdate;
+                    });
+                }
+
+                aspectPromises.push(updatePromise.then(doUpdate => {
+                    log.verbose("ProfileService", "Performing avatar update for " + username + " = " + doUpdate);
+                    if (!doUpdate) return;
+                    profile.avatarUrl = account.profile_picture;
+                    profile.expires = moment().add(this._cacheTime, 'hours');
+                    PubSub.publish("profileUpdate", {changed: 'avatar', profile: profile, username: username});
+                    changed = true;
+                }));
             }
 
             if (account.full_name != profile.displayName || forceUpdate) {
+                log.verbose("ProfileService", "Display name changed for " + username);
                 profile.displayName = account.full_name;
                 profile.expires = moment().add(this._cacheTime, 'hours');
                 PubSub.publish("profileUpdate", {changed: 'displayName', profile: profile, username: username});
                 changed = true;
+                aspectPromises.push(Promise.resolve());
             }
 
+            return Promise.all(aspectPromises);
+        }).then(() => {
             if (changed) {
                 return InstagramStore.getOrCreateUser(username, profile.accountId)
                     .then(user => InstagramStore.updateUser(user.id, profile.displayName, profile.avatarUrl, profile.expires.valueOf()));

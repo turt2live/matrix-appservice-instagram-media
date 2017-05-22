@@ -17,6 +17,8 @@ db/*.db
 
 web-dist/
 
+temp/
+
 # Logs
 logs
 *.log
