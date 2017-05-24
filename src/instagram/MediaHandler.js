@@ -90,10 +90,11 @@ class MediaHandler {
         return InstagramStore.findUserByAccountId(accountId).then(user => {
             userId = user.id;
             username = user.username;
+            if (user.isDelisted) return Promise.resolve(null);
             return InstagramApiHandler.media(mediaId);
         }).then(media => {
             if (!media) {
-                log.error("MediaHandler", "Could not find media " + mediaId);
+                log.error("MediaHandler", "Could not find media " + mediaId + " or user is delisted");
                 return Promise.resolve();
             }
             return this._tryPostMedia(media, username, userId);
@@ -138,6 +139,7 @@ class MediaHandler {
         var accounts = {}; // { userId: User }
         InstagramStore.listUsersWithExpiredMedia().then(users => {
             for (var user of users) {
+                if (user.isDelisted) continue; // skip delisted
                 accounts[user.id] = user;
             }
             if (users.length == 0) return Promise.resolve([]); // skip extra db call if we're not going to do anything

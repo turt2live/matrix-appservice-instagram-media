@@ -36,6 +36,11 @@ module.exports = function (sequelize, DataTypes) {
             type: DataTypes.TIME,
             allowNull: true,
             field: 'mediaExpirationTime'
+        },
+        isDelisted: {
+            type: DataTypes.BOOLEAN,
+            allowNull: true,
+            field: 'isDelisted'
         }
     }, {
         tableName: 'users',

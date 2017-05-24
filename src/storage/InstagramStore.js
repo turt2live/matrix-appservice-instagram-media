@@ -119,7 +119,9 @@ class InstagramStore {
                 username: username,
                 displayName: username,
                 avatarUrl: 'http://i.imgur.com/DQKje5W.png', // instagram icon
-                profileExpires: Sequelize.literal("CURRENT_TIMESTAMP")
+                profileExpires: Sequelize.literal("CURRENT_TIMESTAMP"),
+                mediaExpirationTime: Sequelize.literal("CURRENT_TIMESTAMP"),
+                isDelisted: false
             });
             else return user;
         }).then(u => new User(u));
@@ -303,6 +305,46 @@ class InstagramStore {
             return Promise.all(promises);
         });
     }
+
+    /**
+     * Gets all of the Instargram accounts the given matrix user has authorized
+     * @param {string} mxId the matrix user ID to check for
+     * @returns {Promise<User[]>} resolves to an array of Users the matrix user has authorized
+     */
+    getAuthorizedAccounts(mxId) {
+        return this.__UserOAuthTokens.findAll({
+            include: [{
+                model: this.__Users,
+                as: 'user'
+            }],
+            where: {
+                mxId: mxId
+            }
+        }).then(results => (results || []).map(u => new User(u.user)));
+    }
+
+    /**
+     * Flags a user as delisted
+     * @param {number} userId the user ID to flag
+     * @param {boolean} delisted whether or not the user is delisted
+     * @returns {Promise<>} resolves when complete
+     */
+    flagDelisted(userId, delisted) {
+        return this.__Users.findById(userId).then(user => {
+            if (user.isDelisted === delisted) return Promise.resolve();
+            user.isDelisted = delisted;
+            return user.save();
+        });
+    }
+
+    /**
+     * Gets all the media posted by the bridge user
+     * @param {number} userId the bridge user ID to lookup
+     * @returns {Promise<MediaEvent[]>} resolves to an array of MediaEvents for that user, if any
+     */
+    getMediaEvents(userId) {
+        return this.__UserMedia.findAll({where: {userId: userId}}).then(events => (events || []).map(e => new MediaEvent(e)));
+    }
 }
 
 /**
@@ -321,6 +363,15 @@ function timestamp(val) {
 }
 
 /**
+ * Converts a database value to a boolean
+ * @param {*} val the value from the database
+ * @return {boolean} the boolean
+ */
+function dbToBool(val) {
+    return val === 1 || val === true;
+}
+
+/**
  * Represents a User from the database.
  */
 class User {
@@ -332,6 +383,20 @@ class User {
         this.avatarUrl = dbFields.avatarUrl;
         this.profileExpires = timestamp(dbFields.profileExpires);
         this.mediaExpires = timestamp(dbFields.mediaExpirationTime);
+        this.isDelisted = dbToBool(dbFields.isDelisted);
+    }
+}
+
+/**
+ * Represents a Media Event from the database.
+ */
+class MediaEvent {
+    constructor(dbFields) {
+        this.id = dbFields.id;
+        this.userId = dbFields.userId;
+        this.mediaId = dbFields.mediaId;
+        this.mxEventId = dbFields.mxEventId;
+        this.mxRoomId = dbFields.mxRoomId;
     }
 }
 

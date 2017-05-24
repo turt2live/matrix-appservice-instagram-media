@@ -73,7 +73,9 @@ class OAuthService {
                         log.info("OAuthService", "Auth successful for " + mxid);
 
                         var handled = false;
+                        var userId = 0;
                         InstagramStore.getOrCreateUser(username, accountId).then(igUser => {
+                            userId = igUser.id;
                             return InstagramStore.saveAuthToken(igUser.id, mxid, authToken);
                         }, err=> {
                             log.error("OAuthService", "Error handling auth check");
@@ -81,6 +83,12 @@ class OAuthService {
                             //res.sendStatus(500);
                             res.redirect("/auth/failed");
                             handled = true;
+                        }).then(() => InstagramStore.flagDelisted(userId, false), err=> {
+                            if (handled) return;
+                            log.error("OAuthService", "Error handling auth check");
+                            log.error("OAuthService", err);
+                            //res.sendStatus(500);
+                            res.redirect("/auth/failed");
                         }).then(() => {
                             if (handled) return;
                             //res.sendStatus(200);

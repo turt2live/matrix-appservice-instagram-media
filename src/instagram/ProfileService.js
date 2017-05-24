@@ -95,12 +95,13 @@ class ProfileService {
      */
     _updateProfile(username, forceUpdate = false) {
         var changed = false;
+        var user = null;
 
         log.info("ProfileService", "Updating profile " + username + " (force = " + forceUpdate + ")");
         if (!this._profiles[username]) {
             this._profiles[username] = {
-                displayName: null,
-                avatarUrl: null,
+                displayName: username,
+                avatarUrl: 'http://i.imgur.com/DQKje5W.png', // Instagram logo
                 accountId: null,
                 expires: moment().add(this._cacheTime, 'hours')
             };
@@ -129,9 +130,13 @@ class ProfileService {
                 return null;
             }
 
-            return InstagramApiHandler.user(accountId);
+            return InstagramStore.getOrCreateUser(username, profile.accountId);
+        }).then(dbUser => {
+            user = dbUser;
+            if (user.isDelisted) return Promise.resolve(null);
+            return InstagramApiHandler.user(profile.accountId);
         }).then(account => {
-            if (!account) return;
+            if (!account || !user) return;
 
             var aspectPromises = [];
 
@@ -186,9 +191,8 @@ class ProfileService {
 
             return Promise.all(aspectPromises);
         }).then(() => {
-            if (changed) {
-                return InstagramStore.getOrCreateUser(username, profile.accountId)
-                    .then(user => InstagramStore.updateUser(user.id, profile.displayName, profile.avatarUrl, profile.expires.valueOf()));
+            if (changed && user) {
+                return InstagramStore.updateUser(user.id, profile.displayName, profile.avatarUrl, profile.expires.valueOf());
             } else return Promise.resolve();
         });
     }
