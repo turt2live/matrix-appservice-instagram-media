@@ -1,6 +1,6 @@
 # matrix-appservice-instagram
 
-[![Greenkeeper badge](https://badges.greenkeeper.io/turt2live/matrix-appservice-instagram.svg)](https://greenkeeper.io/)
+[![Greenkeeper badge](https://badges.greenkeeper.io/turt2live/matrix-appservice-instagram.svg)](https://greenkeeper.io/) [![TravisCI badge](https://travis-ci.org/turt2live/matrix-appservice-instagram.svg?branch=master)](https://travis-ci.org/turt2live/matrix-appservice-instagram)
 
 Bridges Instagram to [[Matrix]](https://matrix.org).
 
