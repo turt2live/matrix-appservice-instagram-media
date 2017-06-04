@@ -41,7 +41,6 @@ class InstagramApiHandler {
                 log.verbose("InstagramApiHandler", "Rate limit results: " + result.remaining + " remaining of " + result.limit + " (for unknown token)");
                 resolve(result.data);
             }, err => {
-                // TODO: Only handle 429
                 log.error("InstagramApiHandler", "Error making request (" + tryCount + "/" + MAX_RETRY_COUNT + " attempts)");
                 log.error("InstagramApiHandler", err);
                 if (tryCount <= MAX_RETRY_COUNT) {
