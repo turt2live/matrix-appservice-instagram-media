@@ -128,6 +128,15 @@ class InstagramStore {
     }
 
     /**
+     * Finds a user by username
+     * @param {string} username the username to lookup
+     * @returns {Promise<User>} resolves to the found user, or null if not found
+     */
+    getUserByUsername(username) {
+        return this.__Users.find({where: {username: username}}).then(user => user ? new User(user) : null);
+    }
+
+    /**
      * Gets an Instagram user from their account ID
      * @param {string} accountId the account ID to lookup
      * @return {Promise<User>} resolves to the found user, or null if not found
@@ -200,6 +209,17 @@ class InstagramStore {
      */
     listUsers() {
         return this.__Users.findAll().then(users => users.map(u => new User(u)));
+    }
+
+    /**
+     * Determines if a given username has any stored authentication tokens
+     * @param {string} username the username to lookup
+     * @returns {Promise<boolean>} resolves to true if there are any authentication tokens for the user, false otherwise
+     */
+    hasAuthTokens(username) {
+        return this.getUserByUsername(username)
+            .then(user => user ? this.__UserOAuthTokens.findAll({where: {userId: user.id}}) : Promise.resolve([]))
+            .then(tokens => tokens.length > 0);
     }
 
     /**

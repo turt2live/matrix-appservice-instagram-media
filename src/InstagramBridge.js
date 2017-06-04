@@ -404,7 +404,11 @@ class InstagramBridge {
         remoteRoom.set("instagram_username", handle);
 
         var realProfile = null;
-        return ProfileService.getProfile(handle).then(profile => {
+
+        return InstagramStore.hasAuthTokens(handle).then(isAuthed => {
+            if (!isAuthed) return Promise.reject(handle + " has not authorized us to use their account");
+            return ProfileService.getProfile(handle);
+        }).then(profile => {
             realProfile = profile;
             return util.uploadContentFromUrl(this._bridge, profile.avatarUrl, this.getBotIntent(), 'icon.png');
         }).then(avatarMxc => {
@@ -460,6 +464,7 @@ class InstagramBridge {
         }).catch(err => {
             log.error("InstagramBridge", "Failed to create room for alias #" + aliasLocalpart);
             log.error("InstagramBridge", err);
+            return Promise.reject(); // send upstream
         });
     }
 

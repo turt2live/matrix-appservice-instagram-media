@@ -18,7 +18,6 @@ class MediaHandler {
      */
     constructor() {
         this._expectedTokens = [];
-        this._polling = false;
 
         // This is called after we initiate a request to subscribe, but before we get the all clear on the subscription
         WebService.app.get('/api/v1/media/push/:token', (req, res) => {
@@ -117,81 +116,6 @@ class MediaHandler {
         }).then(token => {
             this._pushToken = token;
             this._checkSubscription(clientId, clientSecret, baseUrl);
-        });
-
-        setInterval(this._pollAccounts.bind(this), 60 * 1000); // check every 60 seconds
-        this._pollAccounts();
-    }
-
-    /**
-     * Polls for account updates. Does not run checks on accounts expected through the subscription API.
-     * @private
-     */
-    _pollAccounts() {
-        if (this._polling) {
-            log.warn("MediaHandler", "A poll is currently in progress: Skipping check");
-            return;
-        }
-
-        this._polling = true;
-
-        log.info("MediaHandler", "Calculating list of accounts to poll");
-        var accounts = {}; // { userId: User }
-        InstagramStore.listUsersWithExpiredMedia().then(users => {
-            for (var user of users) {
-                if (user.isDelisted) continue; // skip delisted
-                accounts[user.id] = user;
-            }
-            if (users.length == 0) return Promise.resolve([]); // skip extra db call if we're not going to do anything
-            return InstagramStore.listTokenUserIds();
-        }).then(tokenUserIds => {
-            for (var userId of tokenUserIds) {
-                accounts[userId] = null;
-            }
-
-            var users = _.values(accounts);
-            var realUsers = [];
-            _.forEach(users, u => {
-                if (u) realUsers.push(u);
-            });
-
-            var sorted = _.sortBy(realUsers, a => a.mediaExpires);
-
-            log.info("MediaHandler", "Found " + sorted.length + " accounts that need media checks");
-
-            return new Promise((resolve, reject) => {
-                var i = 0;
-                var handler = () => {
-                    if (i < sorted.length) {
-                        var user = sorted[i++];
-                        this._checkMedia(user.accountId, user.id, user.username).then(() => handler());
-                    } else {
-                        log.info("MediaHandler", "Finished updating " + sorted.length + " accounts");
-                        this._polling = false;
-                        resolve();
-                    }
-                };
-                handler(); // invoke
-            });
-        });
-    }
-
-    /**
-     * Checks for new media on a given account
-     * @param {string} accountId the account ID to check
-     * @param {number} userId the bridge's user ID for the account
-     * @param {string} username the username for the account
-     * @return {Promise<>} resolves when the media check is complete
-     * @private
-     */
-    _checkMedia(accountId, userId, username) {
-        return InstagramApiHandler.userMedia(accountId, {count: 1}).then(media => {
-            if (!media || media.length == 0) {
-                log.info("MediaHandler", "No new media found for " + username);
-                return Promise.resolve();
-            }
-
-            return this._tryPostMedia(media[0], username, userId);
         });
     }
 
