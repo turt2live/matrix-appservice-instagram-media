@@ -11,11 +11,11 @@ The appservice collects the following information from all Instagram users affec
 * Public avatar
 * Public media (images, video, etc)
 
-The appservice does *not* collect email addresses, "real" names, addresses, credit card information, or any other potentially sensitive material. The appservice also does not read comments or likes.
+The appservice does *not* collect email addresses, "real" names, addresses, credit card information, or any other potentially sensitive material. The appservice does not read comments or likes.
 
 ## Which accounts are affected?
 
-The appservice will automatically process information received from Instagram for any user who has authorized the bridge using the OAuth flow. The bridge will also process information regularly for publicly accessible accounts that have been chosen by the matrix users to be accessible in matrix. The appservice will not process information for private accounts, even if those users have signed in using the OAuth flow.
+The appservice will automatically process information received from Instagram for any user who has authorized the bridge using the OAuth flow. All other Instagram accounts will not be processed by the bridge.
 
 ## Can I opt out of having my account accessible on matrix?
 
@@ -31,4 +31,4 @@ Authorizing (`!auth`) after issuing `!delist` will cause your account to no long
 
 ## How will my media be used?
 
-As stated in the introduction for this document, the maintainers cannot guarantee how the data will be used once it reaches the federation. The appservice does not save or store your media intentionally and does not perform any additional analysis on the media. The appservice just takes the media posted to Instagram and sends it to a corresponding room on matrix.
+As stated in the introduction for this document, the maintainers cannot guarantee how the data will be used once it reaches the federation. The appservice does not save or store your media intentionally and does not perform any additional analysis on the media. The appservice just takes the media posted to Instagram and sends it to corresponding rooms on matrix.
